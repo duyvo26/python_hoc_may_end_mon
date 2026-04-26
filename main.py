@@ -44,6 +44,12 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         gr.Markdown("# 🚀 Hệ thống Phân cụm Internet Chuyên sâu (Modular)")
     
     with gr.Tab("1. Dữ liệu & Tương quan"):
+        gr.Markdown("""
+> 📌 **Hướng dẫn:** Tải lên tệp CSV chứa dữ liệu cần phân cụm. Hệ thống sẽ tự động:
+> - Hiển thị 5 dòng dữ liệu đầu tiên để xem trước.
+> - Vẽ **Ma trận tương quan** để giúp anh/chị nhận biết mối quan hệ tuyến tính giữa các đặc trưng.
+> - Màu **đỏ** = tương quan dương mạnh | Màu **xanh** = tương quan âm | Màu **trắng** = không tương quan.
+        """)
         with gr.Row():
             file_in = gr.File(label="Tải lên CSV", file_types=[".csv"])
             status_in = gr.Textbox(label="Trạng thái hệ thống")
@@ -52,6 +58,14 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
             heatmap_out = gr.Plot(label="Ma trận tương quan (Heatmap)")
             
     with gr.Tab("2. Tiền xử lý & Outliers"):
+        gr.Markdown("""
+> 📌 **Hướng dẫn:** Xem trước dữ liệu gốc, sau đó cấu hình các bước tiền xử lý:
+> - **Xoá cột:** Loại bỏ các cột định danh (ID, tên,...) không có ý nghĩa phân cụm.
+> - **Xử lý Missing — Mean/Median:** Điền giá trị trung bình/trung vị vào ô trống | **Drop:** Xoá hàng có giá trị trống.
+> - **StandardScaler:** Chuẩn hoá về phân phối chuẩn (μ=0, σ=1) — phù hợp K-Means.
+> - **MinMaxScaler:** Co giãn về khoảng [0,1] — phù hợp khi dữ liệu không có phân phối chuẩn.
+> - **Z-Score Outlier:** Tự động loại bỏ các điểm dữ liệu bất thường (Z > 3 sigma).
+        """)
         gr.Markdown("### 🔍 Dữ liệu gốc (5 dòng đầu) để tham khảo khi chọn cột cần xoá")
         raw_data_preview_tab2 = gr.DataFrame(label="Dữ liệu gốc (Xem trước 5 dòng)")
         with gr.Row():
@@ -80,6 +94,14 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
 - **Calinski-Harabasz Index:** Tỷ lệ giữa phương sai giữa các cụm và phương sai trong nội bộ cụm. **(Càng cao càng tốt)**.
                 """)
             with gr.Column():
+                gr.Markdown("""
+**⚙️ Cấu hình Mô hình:**
+- **K (số cụm):** Hệ thống tự gợi ý K tối ưu ở bước trên. Anh có thể điều chỉnh thủ công nếu muốn.
+- **Linkage — ward:** Tối thiểu phương sai trong cụm *(khuyên dùng)*.
+- **complete:** Khoảng cách xa nhất giữa 2 điểm của 2 cụm.
+- **average:** Khoảng cách trung bình giữa tất cả các cặp điểm.
+- **single:** Khoảng cách gần nhất — dễ bị ảnh hưởng bởi nhiễu.
+                """)
                 k_num = gr.Slider(2, 10, 3, step=1, label="Chọn số cụm (K)")
                 link_type = gr.Dropdown(["ward", "complete", "average", "single"], value="ward", label="Phương pháp Linkage")
                 btn_train = gr.Button("Bước 3: 🚀 Chạy mô hình so sánh", variant="primary")
@@ -89,9 +111,19 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
             plot_cluster_h = gr.Plot(label="Hierarchical (PCA)")
         with gr.Row():
             plot_dendro = gr.Plot(label="Biểu đồ Dendrogram")
+        gr.Markdown("""
+> 📌 **Đọc kết quả:** Biểu đồ 3D PCA chiếu dữ liệu xuống không gian 3 chiều để trực quan hoá các cụm.
+> Tâm cụm được đánh dấu bằng dấu **✕ đỏ đậm**. Đường nét đứt đỏ trên Dendrogram là ngưỡng cắt tương ứng với K đã chọn.
+        """)
         res_metrics = gr.DataFrame(label="Bảng so sánh hiệu năng")
 
     with gr.Tab("4. Đặc trưng & Xuất file"):
+        gr.Markdown("""
+> 📌 **Hướng dẫn Tab 4:**
+> 1. Xem bảng **Đặc trưng cụm** để hiểu rõ giá trị trung bình của từng nhóm (phân tích ý nghĩa kinh doanh).
+> 2. Bấm **Khởi tạo Prompt** để copy nội dung gửi cho ChatGPT viết đoạn phân tích học thuật tự động.
+> 3. Bấm **Tải Full Báo Cáo** để tải về một file ZIP gồm toàn bộ CSV + hình ảnh biểu đồ chất lượng cao (300 DPI).
+        """)
         gr.Markdown("### 📊 Đặc trưng trung bình của từng cụm (Profiling)")
         res_profile = gr.DataFrame(label="Đặc trưng cụm")
         
