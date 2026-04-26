@@ -33,13 +33,13 @@ class DataProcessor:
         
         # Heatmap
         numeric_df = self.df.select_dtypes(include=[np.number])
-        fig_corr, ax = plt.subplots(figsize=(12, 8), dpi=200)
+        fig_corr, ax = plt.subplots(figsize=(10, 8), dpi=300)
         if not numeric_df.empty:
             # Chỉ hiển thị số liệu nếu số cột <= 10 để tránh rối rắm
             show_annot = len(numeric_df.columns) <= 12
-            sns.heatmap(numeric_df.corr(), annot=show_annot, fmt=".2f", cmap='coolwarm', center=0, 
-                        linewidths=1.0, linecolor='white', annot_kws={"size": 10, "weight": "bold"}, ax=ax)
-            ax.set_title("Ma trận tương quan đặc trưng (Correlation Heatmap)", fontsize=16, fontweight='bold', pad=20)
+            sns.heatmap(numeric_df.corr(), annot=show_annot, fmt=".2f", cmap='RdBu_r', center=0, 
+                        linewidths=0.5, linecolor='white', annot_kws={"size": 10}, ax=ax)
+            ax.set_title("Hình 1: Ma trận tương quan đặc trưng", fontsize=14, pad=15)
             plt.xticks(rotation=45, ha='right', fontsize=10)
             plt.yticks(rotation=0, fontsize=10)
             plt.tight_layout()

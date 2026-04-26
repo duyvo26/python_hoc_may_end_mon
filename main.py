@@ -15,10 +15,18 @@ except ImportError:
 from data_processor import DataProcessor
 from model_manager import ModelManager
 
-# Cấu hình thẩm mỹ chung
+# Cấu hình thẩm mỹ chuẩn Báo cáo Khoa học (Academic Report)
 plt.style.use('default')
-sns.set_theme(style="whitegrid")
-sns.set_palette("viridis")
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Times New Roman', 'DejaVu Serif']
+plt.rcParams['axes.labelsize'] = 12
+plt.rcParams['axes.titlesize'] = 14
+plt.rcParams['xtick.labelsize'] = 11
+plt.rcParams['ytick.labelsize'] = 11
+plt.rcParams['legend.fontsize'] = 11
+plt.rcParams['figure.dpi'] = 300
+sns.set_theme(style="ticks", rc={"font.family": "serif", "font.serif": ["Times New Roman", "DejaVu Serif"]})
+sns.set_palette("colorblind")
 
 from app_controller import AppController
 
