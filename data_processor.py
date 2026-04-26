@@ -19,7 +19,7 @@ class DataProcessor:
         
         # Heatmap
         numeric_df = self.df.select_dtypes(include=[np.number])
-        fig_corr, ax = plt.subplots(figsize=(12, 8))
+        fig_corr, ax = plt.subplots(figsize=(12, 8), dpi=200)
         if not numeric_df.empty:
             # Chỉ hiển thị số liệu nếu số cột <= 10 để tránh rối rắm
             show_annot = len(numeric_df.columns) <= 10
