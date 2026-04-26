@@ -8,6 +8,10 @@ from data_processor import DataProcessor
 from model_manager import ModelManager
 
 class AppController:
+    """
+    Lớp điều khiển (Controller) dùng để kết nối giữa giao diện Gradio và phần xử lý logic (ModelManager, DataProcessor).
+    Lưu trữ trạng thái các biểu đồ và dữ liệu để phục vụ chức năng xuất báo cáo.
+    """
     def __init__(self):
         self.data_processor = DataProcessor()
         self.model_manager = ModelManager()
@@ -20,6 +24,7 @@ class AppController:
         self.profile = None
 
     def handle_load(self, file):
+        """Xử lý sự kiện khi người dùng tải tệp CSV lên."""
         if file is None:
             return None, pd.DataFrame(), gr.update(choices=[]), "⚠️ Vui lòng tải lên file CSV.", None
         try:
@@ -31,6 +36,7 @@ class AppController:
             return None, pd.DataFrame(), gr.update(choices=[]), f"❌ Lỗi: {str(e)}", None
 
     def handle_preprocess(self, cols_to_drop, imputer_method, scaler_method, remove_outliers):
+        """Xử lý sự kiện tiền xử lý dữ liệu từ Tab 2."""
         try:
             processed_df, _ = self.data_processor.preprocess_data(cols_to_drop, imputer_method, scaler_method, remove_outliers)
             return f"✅ Tiền xử lý xong! Còn lại {len(processed_df)} dòng.", processed_df.head(10)
@@ -38,6 +44,7 @@ class AppController:
             return f"❌ Lỗi tiền xử lý: {str(e)}", None
 
     def handle_elbow(self):
+        """Xử lý sự kiện vẽ biểu đồ Elbow và đánh giá tự động K."""
         if self.data_processor.processed_df is None:
             return None, pd.DataFrame(), "⚠️ Hãy thực hiện Tiền xử lý trước!", gr.update()
         fig = self.model_manager.get_elbow_plot(self.data_processor.processed_df)
@@ -47,6 +54,7 @@ class AppController:
         return fig, detail_df, msg, gr.update(value=final_k)
 
     def handle_train(self, n_clusters, linkage_type):
+        """Xử lý sự kiện chạy thuật toán K-Means và Hierarchical."""
         if self.data_processor.processed_df is None:
             err_df = pd.DataFrame({"Lỗi": ["⚠️ Hãy thực hiện Tiền xử lý trước."]})
             return None, None, None, err_df, err_df
@@ -69,6 +77,7 @@ class AppController:
             return None, None, None, err_df, err_df
 
     def handle_export_all(self):
+        """Đóng gói toàn bộ file dữ liệu và hình ảnh biểu đồ vào 1 file ZIP duy nhất để tải về."""
         export_dir = os.path.join(tempfile.gettempdir(), "clustering_export")
         os.makedirs(export_dir, exist_ok=True)
         
@@ -109,6 +118,7 @@ class AppController:
         return f"{zip_path}.zip"
 
     def handle_chatgpt(self, metrics, profile):
+        """Tạo URL Prompt tự động điền sẵn dữ liệu để gửi cho ChatGPT viết báo cáo."""
         if metrics is None or profile is None or metrics.empty or profile.empty:
             return "⚠️ Cần chạy mô hình so sánh trước để có số liệu.", ""
         try:

@@ -34,7 +34,6 @@ controller = AppController()
 with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     with gr.Row():
         gr.Markdown("# 🚀 Hệ thống Phân cụm Internet Chuyên sâu (Modular)")
-        sys_info = gr.Textbox(value=get_sys_info(), label="Theo dõi tài nguyên", interactive=False, max_lines=1)
     
     with gr.Tab("1. Dữ liệu & Tương quan"):
         with gr.Row():
@@ -58,6 +57,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         preview_pre = gr.DataFrame(label="Dữ liệu sau xử lý (Xem trước)")
         
     with gr.Tab("3. Tìm K & Huấn luyện"):
+        sys_info = gr.Textbox(value=get_sys_info(), label="Tài nguyên Server (Cập nhật Live)", interactive=False, max_lines=1)
         with gr.Row():
             with gr.Column():
                 btn_elbow = gr.Button("Bước 2: 🔍 Vẽ biểu đồ Elbow & Đánh giá tự động K", variant="secondary")

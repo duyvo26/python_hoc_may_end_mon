@@ -6,12 +6,26 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
 from scipy import stats
 
 class DataProcessor:
+    """
+    Lớp xử lý dữ liệu đầu vào.
+    Chịu trách nhiệm đọc dữ liệu, làm sạch, xử lý giá trị khuyết thiếu (missing values),
+    chuẩn hoá (scaling), và tạo biểu đồ Heatmap tương quan.
+    """
     def __init__(self):
         self.df = None
         self.processed_df = None
         self.profile_base_df = None
 
     def load_data(self, file_path):
+        """
+        Nạp dữ liệu từ tệp CSV và tạo biểu đồ Heatmap tương quan.
+        
+        Args:
+            file_path (str): Đường dẫn tới tệp CSV cần nạp.
+            
+        Returns:
+            tuple: Gồm mã HTML xem trước, danh sách các cột, và Figure matplotlib chứa Heatmap.
+        """
         self.df = pd.read_csv(file_path)
         cols = self.df.columns.tolist()
         html_table = self.df.head().to_html(classes='table table-striped', index=False)
@@ -35,6 +49,18 @@ class DataProcessor:
         return preview, cols, fig_corr
 
     def preprocess_data(self, cols_to_drop, imputer_method, scaler_method, remove_outliers):
+        """
+        Thực hiện tiền xử lý dữ liệu: xoá cột, xử lý thiếu, mã hoá Label, xử lý nhiễu (outliers) và chuẩn hoá.
+        
+        Args:
+            cols_to_drop (list): Danh sách các cột cần loại bỏ.
+            imputer_method (str): Phương pháp xử lý missing values ('Mean', 'Median', 'Drop').
+            scaler_method (str): Phương pháp chuẩn hoá ('StandardScaler', 'MinMaxScaler').
+            remove_outliers (bool): Cờ bật/tắt chức năng loại bỏ nhiễu bằng Z-score.
+            
+        Returns:
+            tuple: Dữ liệu đã tiền xử lý (DataFrame) và lỗi (nếu có).
+        """
         if self.df is None:
             raise ValueError("Chưa có dữ liệu.")
             

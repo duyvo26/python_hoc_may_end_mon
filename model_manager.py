@@ -15,10 +15,25 @@ except ImportError:
     PLOTLY_AVAILABLE = False
 
 class ModelManager:
+    """
+    Lớp quản lý các mô hình Học máy phân cụm.
+    Chịu trách nhiệm thực thi các thuật toán tìm K tối ưu (Elbow, Silhouette, ...),
+    huấn luyện mô hình K-Means & Hierarchical, và trực quan hoá biểu đồ (Matplotlib/Plotly).
+    """
     def __init__(self):
         self.final_labeled_df = None
 
     def get_elbow_plot(self, processed_df):
+        """
+        Vẽ biểu đồ Elbow và các chỉ số (Silhouette, Davies-Bouldin, Calinski-Harabasz) 
+        để trực quan hoá quá trình tìm số lượng cụm (K) tối ưu.
+        
+        Args:
+            processed_df (DataFrame): Dữ liệu đã qua tiền xử lý.
+            
+        Returns:
+            Figure: Đối tượng Figure của matplotlib chứa 4 biểu đồ con.
+        """
         X = processed_df.values
         if len(X) < 3:
             fig, ax = plt.subplots()
@@ -71,6 +86,16 @@ class ModelManager:
         return fig
 
     def find_optimal_k(self, processed_df):
+        """
+        Thuật toán tự động tìm số lượng cụm (K) tối ưu thông qua cơ chế biểu quyết đa số (Voting System)
+        dựa trên 3 chỉ số đo lường hiệu năng phân cụm.
+        
+        Args:
+            processed_df (DataFrame): Dữ liệu đã qua tiền xử lý.
+            
+        Returns:
+            tuple: K tối ưu (int) và Bảng chi tiết kết quả biểu quyết (DataFrame).
+        """
         X = processed_df.values
         if len(X) < 3:
             return 2, pd.DataFrame([{"Lỗi": "Dữ liệu quá ít để tìm K."}])
@@ -112,6 +137,20 @@ class ModelManager:
         return final_k, detail_df
 
     def run_clustering(self, processed_df, profile_base_df, n_clusters, linkage_type):
+        """
+        Thực thi thuật toán K-Means và Hierarchical Clustering trên dữ liệu đầu vào.
+        Sau đó thực hiện giảm chiều dữ liệu bằng PCA (nếu cần) và dựng biểu đồ 3D Interactive.
+        
+        Args:
+            processed_df (DataFrame): Dữ liệu đã tiền xử lý dùng để huấn luyện.
+            profile_base_df (DataFrame): Dữ liệu gốc để lấy đặc trưng (profiling) sau khi gán nhãn.
+            n_clusters (int): Số lượng cụm (K) cần phân chia.
+            linkage_type (str): Phương pháp linkage cho Hierarchical Clustering ('ward', 'complete', 'average', 'single').
+            
+        Returns:
+            tuple: Trả về 6 giá trị gồm biểu đồ 3D K-Means, biểu đồ 3D Hierarchical, biểu đồ Dendrogram,
+                   bảng so sánh hiệu năng (metrics), bảng đặc trưng cụm (profiling), và tập dữ liệu cuối cùng đã gắn nhãn.
+        """
         X = processed_df.values
         
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
