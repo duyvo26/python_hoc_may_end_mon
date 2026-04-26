@@ -16,7 +16,8 @@ class AppController:
         self.data_processor = DataProcessor()
         self.model_manager = ModelManager()
         self.fig_corr = None
-        self.fig_elbow = None
+        self.fig_elbow_km = None
+        self.fig_elbow_h = None
         self.fig_km = None
         self.fig_h = None
         self.fig_dendro = None
@@ -49,13 +50,13 @@ class AppController:
     def handle_elbow(self, n_trials):
         """Vẽ biểu đồ và trả về 2 K tối ưu riêng biệt cho K-Means và Hierarchical."""
         if self.data_processor.processed_df is None:
-            return None, pd.DataFrame(), "⚠️ Hãy thực hiện Tiền xử lý trước!", gr.update(), gr.update(), gr.update()
-        fig, detail_df, k_kmeans, k_hierarchical = self.model_manager.analyze_k(self.data_processor.processed_df, n_trials=int(n_trials))
-        self.fig_elbow = fig
+            return None, None, pd.DataFrame(), "⚠️ Hãy thực hiện Tiền xử lý trước!", gr.update(), gr.update(), gr.update()
+        fig_km, fig_h, detail_df, k_kmeans, k_hierarchical = self.model_manager.analyze_k(self.data_processor.processed_df, n_trials=int(n_trials))
+        self.fig_elbow_km = fig_km
+        self.fig_elbow_h = fig_h
         msg = (f"📊 Đã tính toán (TB qua {n_trials} lần). "
-               f"K-Means → {k_kmeans} | Hierarchical → {k_hierarchical} "
-               f"(Weighted Voting: Sil×2 • CH×2 • DB×2 • Kneedle×1)")
-        return fig, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical), gr.update(interactive=False)
+               f"K-Means → {k_kmeans} | Hierarchical → {k_hierarchical}")
+        return fig_km, fig_h, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical), gr.update(interactive=False)
 
     def handle_train(self, k_kmeans, k_hierarchical, linkage_type):
         """Chạy K-Means với k_kmeans và Hierarchical với k_hierarchical riêng biệt."""
@@ -104,8 +105,10 @@ class AppController:
         # Save Charts
         if self.fig_corr is not None:
             self.fig_corr.savefig(os.path.join(export_dir, "chart_1_correlation_heatmap.png"), bbox_inches='tight')
-        if self.fig_elbow is not None:
-            self.fig_elbow.savefig(os.path.join(export_dir, "chart_2_elbow_method.png"), bbox_inches='tight')
+        if self.fig_elbow_km is not None:
+            self.fig_elbow_km.savefig(os.path.join(export_dir, "chart_2a_elbow_kmeans.png"), bbox_inches='tight')
+        if self.fig_elbow_h is not None:
+            self.fig_elbow_h.savefig(os.path.join(export_dir, "chart_2b_elbow_hierarchical.png"), bbox_inches='tight')
         if self.fig_dendro is not None:
             self.fig_dendro.savefig(os.path.join(export_dir, "chart_3_dendrogram.png"), bbox_inches='tight')
             
@@ -149,12 +152,41 @@ class AppController:
             return f"Lỗi: {e}", "", gr.update()
 
     def handle_copy_table(self, df):
-        """Chuyển đổi DataFrame thành chuỗi để copy và khóa nút."""
-        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
+        """Chuyển đổi DataFrame thành chuỗi văn bản (dạng bảng) để copy và khóa nút."""
+        if df is None:
             return "", gr.update()
+            
+        # Xử lý trường hợp Gradio truyền vào dict (thường gặp ở bản Gradio mới)
+        if isinstance(df, dict):
+            try:
+                df = pd.DataFrame(data=df.get('data', []), columns=df.get('headers', []))
+            except:
+                return str(df), gr.update(value="✅ Đã Copy & Khoá", interactive=False)
+
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            return "", gr.update()
+
         try:
-            # Chuyển sang CSV string để dễ dán vào Excel
-            csv_str = df.to_csv(index=False, sep='\t') # Dùng tab để dán vào Excel đẹp hơn
-            return csv_str, gr.update(value="✅ Đã Copy & Khoá", interactive=False)
+            # Tạo chuỗi văn bản dạng bảng thủ công (để không phụ thuộc thư viện tabulate)
+            headers = [str(c) for c in df.columns]
+            rows = [[str(v) for v in r] for r in df.values]
+            
+            # Tính độ rộng tối đa cho mỗi cột
+            col_widths = [len(h) for h in headers]
+            for row in rows:
+                for i, v in enumerate(row):
+                    col_widths[i] = max(col_widths[i], len(v))
+            
+            # Dựng bảng text
+            lines = []
+            header_line = " | ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
+            lines.append(header_line)
+            lines.append("-+-".join("-" * col_widths[i] for i in range(len(headers))))
+            for row in rows:
+                lines.append(" | ".join(v.ljust(col_widths[i]) for i, v in enumerate(row)))
+            
+            text_table = "\n".join(lines)
+            return text_table, gr.update(value="✅ Đã Copy & Khoá", interactive=False)
         except Exception:
-            return "", gr.update()
+            # Fallback sang dạng string mặc định của pandas
+            return df.to_string(index=False), gr.update(value="✅ Đã Copy & Khoá", interactive=False)

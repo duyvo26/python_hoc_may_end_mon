@@ -101,7 +101,8 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
                 n_trials_slider = gr.Slider(1, 10, 1, step=1, label="Số lần chạy thử (N trials) - Càng cao càng ổn định nhưng chạy lâu hơn")
                 btn_elbow = gr.Button("Bước 2: 🔍 Vẽ biểu đồ Elbow & Đánh giá tự động K", variant="secondary")
                 status_k = gr.Textbox(label="Kết quả gợi ý")
-                plot_elbow = gr.Plot()
+                plot_elbow_km = gr.Plot(label="Phân tích K-Means (Elbow, Sil, DB, CH)")
+                plot_elbow_h = gr.Plot(label="Phân tích Hierarchical (Sil, DB, CH)")
                 k_details = gr.DataFrame(label="Bảng chi tiết biểu quyết tìm K tối ưu")
                 with gr.Row():
                     btn_copy_k = gr.Button("📋 Copy bảng trên", variant="secondary", size="sm")
@@ -193,7 +194,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     
     btn_pre.click(controller.handle_preprocess, inputs=[drop_cols, imp_method, scl_method, out_check], outputs=[status_pre, preview_pre, btn_pre])
     
-    btn_elbow.click(controller.handle_elbow, inputs=[n_trials_slider], outputs=[plot_elbow, k_details, status_k, k_kmeans_slider, k_hier_slider, btn_elbow])
+    btn_elbow.click(controller.handle_elbow, inputs=[n_trials_slider], outputs=[plot_elbow_km, plot_elbow_h, k_details, status_k, k_kmeans_slider, k_hier_slider, btn_elbow])
     
     btn_train.click(controller.handle_train, inputs=[k_kmeans_slider, k_hier_slider, link_type], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile_km, res_profile_h, btn_train])
     
