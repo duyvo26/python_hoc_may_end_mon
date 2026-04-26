@@ -134,6 +134,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         with gr.Row():
             plot_cluster_km = gr.Plot(label="K-Means (PCA)")
             plot_cluster_h = gr.Plot(label="Hierarchical (PCA)")
+        with gr.Row():
             plot_dendro = gr.Plot(label="Biểu đồ Dendrogram")
         res_metrics = gr.DataFrame(label="Bảng so sánh hiệu năng")
 
