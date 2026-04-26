@@ -163,4 +163,5 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     btn_exp.click(controller.handle_export, outputs=[file_out])
 
 if __name__ == "__main__":
-    demo.launch()
+    # demo.launch()
+    demo.launch(share=True)
