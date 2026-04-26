@@ -97,13 +97,24 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
                 gr.Markdown("""
 **⚙️ Cấu hình Mô hình:**
 - **K (số cụm):** Hệ thống tự gợi ý K tối ưu ở bước trên. Anh có thể điều chỉnh thủ công nếu muốn.
-- **Linkage — ward:** Tối thiểu phương sai trong cụm *(khuyên dùng)*.
-- **complete:** Khoảng cách xa nhất giữa 2 điểm của 2 cụm.
-- **average:** Khoảng cách trung bình giữa tất cả các cặp điểm.
-- **single:** Khoảng cách gần nhất — dễ bị ảnh hưởng bởi nhiễu.
+
+**🔗 Phương pháp Linkage (Hierarchical):**
+| Linkage | Mô tả | Ưu điểm | Nhược điểm |
+|---|---|---|---|
+| **ward** | Tối thiểu phương sai trong cụm | Cụm đều, không bị mất cân bằng | Chỉ dùng Euclidean |
+| **complete** | Khoảng cách lớn nhất giữa 2 cụm | Cụm gọn | Nhạy cảm với nhiễu |
+| **average** | Khoảng cách trung bình | Cân bằng giữa ward & complete | Chậm hơn ward |
+| **single** | Khoảng cách nhỏ nhất | Phát hiện cụm hình dạng phi tòa | Dễ bị hiệu ứng chuỗi |
+| **weighted** | TB giượng các hợp nhất | Phù hợp cụm không đều | Áp dụng hạn chế |
+| **centroid** | Khoảng cách tậm cụm | Trực quan | Có thể bj đảo ngược |
                 """)
-                k_num = gr.Slider(2, 10, 3, step=1, label="Chọn số cụm (K)")
-                link_type = gr.Dropdown(["ward", "complete", "average", "single"], value="ward", label="Phương pháp Linkage")
+                k_kmeans_slider = gr.Slider(2, 10, 3, step=1, label="🟢 K cho K-Means (tự điều chỉnh sau khi tìm K)")
+                k_hier_slider = gr.Slider(2, 10, 3, step=1, label="🔴 K cho Hierarchical (tự điều chỉnh sau khi tìm K)")
+                link_type = gr.Dropdown(
+                    ["ward", "complete", "average", "single", "weighted", "centroid"],
+                    value="ward",
+                    label="🔗 Phương pháp Linkage (Hierarchical)"
+                )
                 btn_train = gr.Button("Bước 3: 🚀 Chạy mô hình so sánh", variant="primary")
         
         with gr.Row():
@@ -144,8 +155,8 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     # Sự kiện
     file_in.change(controller.handle_load, inputs=[file_in], outputs=[preview_in, raw_data_preview_tab2, drop_cols, status_in, heatmap_out])
     btn_pre.click(controller.handle_preprocess, inputs=[drop_cols, imp_method, scl_method, out_check], outputs=[status_pre, preview_pre])
-    btn_elbow.click(controller.handle_elbow, outputs=[plot_elbow, k_details, status_k, k_num])
-    btn_train.click(controller.handle_train, inputs=[k_num, link_type], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile])
+    btn_elbow.click(controller.handle_elbow, outputs=[plot_elbow, k_details, status_k, k_kmeans_slider, k_hier_slider])
+    btn_train.click(controller.handle_train, inputs=[k_kmeans_slider, k_hier_slider, link_type], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile])
     btn_chatgpt.click(controller.handle_chatgpt, inputs=[res_metrics, res_profile], outputs=[chatgpt_prompt, chatgpt_link])
     btn_exp.click(controller.handle_export_all, outputs=[file_out])
     

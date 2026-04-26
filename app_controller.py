@@ -44,17 +44,18 @@ class AppController:
             return f"❌ Lỗi tiền xử lý: {str(e)}", None
 
     def handle_elbow(self):
-        """Xử lý sự kiện vẽ biểu đồ Elbow và đánh giá tự động K."""
+        """Vẽ biểu đồ và trả về 2 K tối ưu riêng biệt cho K-Means và Hierarchical."""
         if self.data_processor.processed_df is None:
-            return None, pd.DataFrame(), "⚠️ Hãy thực hiện Tiền xử lý trước!", gr.update()
-        fig = self.model_manager.get_elbow_plot(self.data_processor.processed_df)
+            return None, pd.DataFrame(), "⚠️ Hãy thực hiện Tiền xử lý trước!", gr.update(), gr.update()
+        fig, detail_df, k_kmeans, k_hierarchical = self.model_manager.analyze_k(self.data_processor.processed_df)
         self.fig_elbow = fig
-        final_k, detail_df = self.model_manager.find_optimal_k(self.data_processor.processed_df)
-        msg = f"📊 Đã tính toán. Hệ thống tự động chọn K = {final_k} (Theo biểu quyết đa số)."
-        return fig, detail_df, msg, gr.update(value=final_k)
+        msg = (f"📊 Đã tính toán. "
+               f"K-Means → {k_kmeans} | Hierarchical → {k_hierarchical} "
+               f"(Weighted Voting: Sil×2 • CH×2 • DB×2 • Kneedle×1)")
+        return fig, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical)
 
-    def handle_train(self, n_clusters, linkage_type):
-        """Xử lý sự kiện chạy thuật toán K-Means và Hierarchical."""
+    def handle_train(self, k_kmeans, k_hierarchical, linkage_type):
+        """Chạy K-Means với k_kmeans và Hierarchical với k_hierarchical riêng biệt."""
         if self.data_processor.processed_df is None:
             err_df = pd.DataFrame({"Lỗi": ["⚠️ Hãy thực hiện Tiền xử lý trước."]})
             return None, None, None, err_df, err_df
@@ -63,7 +64,8 @@ class AppController:
             fig_km, fig_h, fig_dendro, metrics, profile_data, _ = self.model_manager.run_clustering(
                 self.data_processor.processed_df, 
                 self.data_processor.profile_base_df, 
-                n_clusters, 
+                k_kmeans,
+                k_hierarchical,
                 linkage_type
             )
             self.fig_km = fig_km
