@@ -3,6 +3,7 @@ import os
 import tempfile
 import pandas as pd
 import urllib.parse
+import shutil
 import matplotlib.pyplot as plt
 import seaborn as sns
 from data_processor import DataProcessor
@@ -17,12 +18,20 @@ class AppController:
     def __init__(self):
         self.data_processor = DataProcessor()
         self.model_manager = ModelManager()
+        self.fig_corr = None
+        self.fig_elbow = None
+        self.fig_km = None
+        self.fig_h = None
+        self.fig_dendro = None
+        self.metrics = None
+        self.profile = None
 
     def handle_load(self, file):
         if file is None:
             return None, pd.DataFrame(), gr.update(choices=[]), "⚠️ Vui lòng tải lên file CSV.", None
         try:
             preview, cols, fig_corr = self.data_processor.load_data(file.name)
+            self.fig_corr = fig_corr
             head5 = self.data_processor.df.head(5)
             return preview, head5, gr.update(choices=cols, value=[]), f"✅ Đã tải: {len(self.data_processor.df)} dòng, {len(cols)} cột.", fig_corr
         except Exception as e:
@@ -39,6 +48,7 @@ class AppController:
         if self.data_processor.processed_df is None:
             return None, pd.DataFrame(), "⚠️ Hãy thực hiện Tiền xử lý trước!", gr.update()
         fig = self.model_manager.get_elbow_plot(self.data_processor.processed_df)
+        self.fig_elbow = fig
         final_k, detail_df = self.model_manager.find_optimal_k(self.data_processor.processed_df)
         msg = f"📊 Đã tính toán. Hệ thống tự động chọn K = {final_k} (Theo biểu quyết đa số)."
         return fig, detail_df, msg, gr.update(value=final_k)
@@ -55,17 +65,55 @@ class AppController:
                 n_clusters, 
                 linkage_type
             )
+            self.fig_km = fig_km
+            self.fig_h = fig_h
+            self.fig_dendro = fig_dendro
+            self.metrics = metrics
+            self.profile = profile_data
             return fig_km, fig_h, fig_dendro, metrics, profile_data
         except Exception as e:
             err_df = pd.DataFrame({"Lỗi": [f"❌ Lỗi: {str(e)}"]})
             return None, None, None, err_df, err_df
 
-    def handle_export(self):
-        if self.model_manager.final_labeled_df is None:
-            return None
-        temp_file = os.path.join(tempfile.gettempdir(), "ket_qua_phan_cum.csv")
-        self.model_manager.final_labeled_df.to_csv(temp_file, index=False, encoding='utf-8-sig')
-        return temp_file
+    def handle_export_all(self):
+        export_dir = os.path.join(tempfile.gettempdir(), "clustering_export")
+        os.makedirs(export_dir, exist_ok=True)
+        
+        # Save CSVs
+        if self.data_processor.df is not None:
+            self.data_processor.df.to_csv(os.path.join(export_dir, "1_data_original.csv"), index=False, encoding='utf-8-sig')
+        if self.data_processor.processed_df is not None:
+            self.data_processor.processed_df.to_csv(os.path.join(export_dir, "2_data_preprocessed.csv"), index=False, encoding='utf-8-sig')
+        if self.model_manager.final_labeled_df is not None:
+            self.model_manager.final_labeled_df.to_csv(os.path.join(export_dir, "3_data_clustered.csv"), index=False, encoding='utf-8-sig')
+        if self.metrics is not None:
+            self.metrics.to_csv(os.path.join(export_dir, "4_metrics.csv"), index=False, encoding='utf-8-sig')
+        if self.profile is not None:
+            self.profile.to_csv(os.path.join(export_dir, "5_profiling.csv"), index=False, encoding='utf-8-sig')
+            
+        # Save Charts
+        if self.fig_corr is not None:
+            self.fig_corr.savefig(os.path.join(export_dir, "chart_1_correlation_heatmap.png"), bbox_inches='tight')
+        if self.fig_elbow is not None:
+            self.fig_elbow.savefig(os.path.join(export_dir, "chart_2_elbow_method.png"), bbox_inches='tight')
+        if self.fig_dendro is not None:
+            self.fig_dendro.savefig(os.path.join(export_dir, "chart_3_dendrogram.png"), bbox_inches='tight')
+            
+        if self.fig_km is not None:
+            if hasattr(self.fig_km, 'write_html'):
+                self.fig_km.write_html(os.path.join(export_dir, "chart_4_kmeans_3d.html"))
+            else:
+                self.fig_km.savefig(os.path.join(export_dir, "chart_4_kmeans.png"), bbox_inches='tight')
+                
+        if self.fig_h is not None:
+            if hasattr(self.fig_h, 'write_html'):
+                self.fig_h.write_html(os.path.join(export_dir, "chart_5_hierarchical_3d.html"))
+            else:
+                self.fig_h.savefig(os.path.join(export_dir, "chart_5_hierarchical.png"), bbox_inches='tight')
+                
+        zip_path = os.path.join(tempfile.gettempdir(), "Bao_Cao_Phan_Cum")
+        shutil.make_archive(zip_path, 'zip', export_dir)
+        return f"{zip_path}.zip"
 
     def handle_chatgpt(self, metrics, profile):
         if metrics is None or profile is None or metrics.empty or profile.empty:
@@ -150,12 +198,19 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
             chatgpt_prompt = gr.Textbox(label="Nội dung Prompt (Có thể copy tay)", lines=5)
             chatgpt_link = gr.HTML(label="Link mở nhanh")
             
+        gr.Markdown("---")
+        gr.Markdown("### 📥 Tải Xuống Toàn Bộ Dữ Liệu Báo Cáo")
+        gr.Markdown("Bấm nút dưới đây để tải về một file nén (.zip) chứa tất cả: Dữ liệu gốc, Dữ liệu sau xử lý, Kết quả gán nhãn cụm, Bảng đánh giá, cùng với **Tất cả các hình ảnh biểu đồ**.")
+        btn_exp = gr.Button("Bước 5: 💾 Tải Full Báo Cáo (.ZIP)", variant="primary")
+        file_out = gr.File(label="File Tổng hợp Báo cáo")
+            
     # Sự kiện
     file_in.change(controller.handle_load, inputs=[file_in], outputs=[preview_in, raw_data_preview_tab2, drop_cols, status_in, heatmap_out])
     btn_pre.click(controller.handle_preprocess, inputs=[drop_cols, imp_method, scl_method, out_check], outputs=[status_pre, preview_pre])
     btn_elbow.click(controller.handle_elbow, outputs=[plot_elbow, k_details, status_k, k_num])
     btn_train.click(controller.handle_train, inputs=[k_num, link_type], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile])
     btn_chatgpt.click(controller.handle_chatgpt, inputs=[res_metrics, res_profile], outputs=[chatgpt_prompt, chatgpt_link])
+    btn_exp.click(controller.handle_export_all, outputs=[file_out])
 
 if __name__ == "__main__":
     # demo.launch()
