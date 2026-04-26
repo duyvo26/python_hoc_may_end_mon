@@ -47,25 +47,25 @@ class ModelManager:
         fig, axes = plt.subplots(2, 2, figsize=(14, 10), dpi=200)
         axes = axes.flatten()
         
-        axes[0].plot(range(1, limit), wcss_all, marker='o', color='#3498db')
-        axes[0].set_title('Elbow Method (WCSS)')
-        axes[0].set_xlabel('Số lượng cụm (k)')
-        axes[0].grid(alpha=0.3)
+        axes[0].plot(range(1, limit), wcss_all, marker='o', color='#3498db', linewidth=2.5, markersize=8, markerfacecolor='white', markeredgewidth=2)
+        axes[0].set_title('Elbow Method (WCSS)', fontsize=14, fontweight='bold')
+        axes[0].set_xlabel('Số lượng cụm (k)', fontsize=12)
+        axes[0].grid(True, linestyle='--', alpha=0.7)
         
-        axes[1].plot(K_range, sil, marker='s', color='#2ecc71')
-        axes[1].set_title('Silhouette Score (↑ Càng cao càng tốt)')
-        axes[1].set_xlabel('Số lượng cụm (k)')
-        axes[1].grid(alpha=0.3)
+        axes[1].plot(K_range, sil, marker='s', color='#2ecc71', linewidth=2.5, markersize=8, markerfacecolor='white', markeredgewidth=2)
+        axes[1].set_title('Silhouette Score (↑ Càng cao càng tốt)', fontsize=14, fontweight='bold')
+        axes[1].set_xlabel('Số lượng cụm (k)', fontsize=12)
+        axes[1].grid(True, linestyle='--', alpha=0.7)
         
-        axes[2].plot(K_range, db, marker='^', color='#e74c3c')
-        axes[2].set_title('Davies-Bouldin Index (↓ Càng thấp càng tốt)')
-        axes[2].set_xlabel('Số lượng cụm (k)')
-        axes[2].grid(alpha=0.3)
+        axes[2].plot(K_range, db, marker='^', color='#e74c3c', linewidth=2.5, markersize=8, markerfacecolor='white', markeredgewidth=2)
+        axes[2].set_title('Davies-Bouldin Index (↓ Càng thấp càng tốt)', fontsize=14, fontweight='bold')
+        axes[2].set_xlabel('Số lượng cụm (k)', fontsize=12)
+        axes[2].grid(True, linestyle='--', alpha=0.7)
         
-        axes[3].plot(K_range, ch, marker='D', color='#f1c40f')
-        axes[3].set_title('Calinski-Harabasz Index (↑ Càng cao càng tốt)')
-        axes[3].set_xlabel('Số lượng cụm (k)')
-        axes[3].grid(alpha=0.3)
+        axes[3].plot(K_range, ch, marker='D', color='#f1c40f', linewidth=2.5, markersize=8, markerfacecolor='white', markeredgewidth=2)
+        axes[3].set_title('Calinski-Harabasz Index (↑ Càng cao càng tốt)', fontsize=14, fontweight='bold')
+        axes[3].set_xlabel('Số lượng cụm (k)', fontsize=12)
+        axes[3].grid(True, linestyle='--', alpha=0.7)
         
         plt.tight_layout()
         return fig
@@ -188,14 +188,19 @@ class ModelManager:
         
         fig_dendro, ax_dendro = plt.subplots(figsize=(12, 6), dpi=200)
         Z = linkage(X, method=linkage_type)
-        dendrogram(Z, ax=ax_dendro, truncate_mode='lastp', p=30)
-        ax_dendro.set_title("Cấu trúc phân cấp (Dendrogram)")
         
-        # Vẽ đường cắt ngang (cut line)
+        # Vẽ đường cắt ngang (cut line) & màu sắc nhánh
         if 1 < n_clusters <= len(Z):
             cut_distance = (Z[-n_clusters, 2] + Z[-n_clusters+1, 2]) / 2.0
-            ax_dendro.axhline(y=cut_distance, color='red', linestyle='--', linewidth=2, label=f'Ngưỡng cắt (K={n_clusters})')
-            ax_dendro.legend()
+            dendrogram(Z, ax=ax_dendro, truncate_mode='lastp', p=30, color_threshold=cut_distance, above_threshold_color='grey')
+            ax_dendro.axhline(y=cut_distance, color='red', linestyle='--', linewidth=2.5, label=f'Ngưỡng cắt (K={n_clusters})')
+            ax_dendro.legend(fontsize=12)
+        else:
+            dendrogram(Z, ax=ax_dendro, truncate_mode='lastp', p=30)
+            
+        ax_dendro.set_title("Cấu trúc phân cấp (Dendrogram)", fontsize=16, fontweight='bold', pad=15)
+        ax_dendro.set_xlabel("Số lượng mẫu / Cụm", fontsize=12)
+        ax_dendro.set_ylabel("Khoảng cách (Distance)", fontsize=12)
         
         metrics = pd.DataFrame({
             "Chỉ số": ["Silhouette Score (Càng cao càng tốt)", "Davies-Bouldin Index (Càng thấp càng tốt)", "Calinski-Harabasz Index (Càng cao càng tốt)"],
