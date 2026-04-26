@@ -1,0 +1,112 @@
+# ==============================
+# Python Standard
+# ==============================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ==============================
+# Data Science & Machine Learning
+# ==============================
+# Data files (CSV, Excel, JSON, etc.)
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.h5
+*.hdf5
+*.parquet
+*.feather
+*.pkl
+*.npy
+*.npz
+
+# Models & Checkpoints
+*.pt
+*.pth
+*.onnx
+*.pb
+*.ckpt
+
+# Gradio / Web App
+flagged/
+gradio_cached_examples/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# ==============================
+# Logs & Caches
+# ==============================
+*.log
+.cache/
+pytest_cache/
+.pytest_cache/
+.tox/
+.coverage
+*.cover
+.mypy_cache/
+.pyre/
+.pytype/
+
+# ==============================
+# OS & IDE
+# ==============================
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+ehthumbs.db
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ==============================
+# Custom Project Folders
+# ==============================
+/download/*
+/docker/
+/utils*
+frontend/public/app/*
