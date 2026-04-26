@@ -210,7 +210,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     btn_copy_profile_km.click(controller.handle_copy_table, inputs=[res_profile_km], outputs=[copy_buffer_profile_km, btn_copy_profile_km]).then(fn=None, inputs=[copy_buffer_profile_km], outputs=None, js=js_copy)
     btn_copy_profile_h.click(controller.handle_copy_table, inputs=[res_profile_h], outputs=[copy_buffer_profile_h, btn_copy_profile_h]).then(fn=None, inputs=[copy_buffer_profile_h], outputs=None, js=js_copy)
     
-    btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy & Khoá", interactive=False)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js=js_copy)
+    btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy", interactive=True)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js=js_copy)
     
     if PSUTIL_AVAILABLE:
         timer = gr.Timer(2)

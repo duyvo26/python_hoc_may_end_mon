@@ -43,7 +43,7 @@ class AppController:
         """Xử lý sự kiện tiền xử lý dữ liệu từ Tab 2."""
         try:
             processed_df, _ = self.data_processor.preprocess_data(cols_to_drop, imputer_method, scaler_method, remove_outliers)
-            return f"✅ Tiền xử lý xong! Còn lại {len(processed_df)} dòng.", processed_df.head(10), gr.update(interactive=False)
+            return f"✅ Tiền xử lý xong! Còn lại {len(processed_df)} dòng.", processed_df.head(10), gr.update(interactive=True)
         except Exception as e:
             return f"❌ Lỗi tiền xử lý: {str(e)}", None, gr.update()
 
@@ -56,7 +56,7 @@ class AppController:
         self.fig_elbow_h = fig_h
         msg = (f"📊 Đã tính toán (TB qua {n_trials} lần). "
                f"K-Means → {k_kmeans} | Hierarchical → {k_hierarchical}")
-        return fig_km, fig_h, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical), gr.update(interactive=False)
+        return fig_km, fig_h, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical), gr.update(interactive=True)
 
     def handle_train(self, k_kmeans, k_hierarchical, linkage_type):
         """Chạy K-Means với k_kmeans và Hierarchical với k_hierarchical riêng biệt."""
@@ -78,7 +78,7 @@ class AppController:
             self.metrics = metrics
             self.profile_km = profile_km
             self.profile_h = profile_h
-            return fig_km, fig_h, fig_dendro, metrics, profile_km, profile_h, gr.update(interactive=False)
+            return fig_km, fig_h, fig_dendro, metrics, profile_km, profile_h, gr.update(interactive=True)
         except Exception as e:
             err_df = pd.DataFrame({"Lỗi": [f"❌ Lỗi: {str(e)}"]})
             return None, None, None, err_df, err_df, err_df, gr.update()
@@ -127,7 +127,7 @@ class AppController:
         zip_name = f"Bao_Cao_{self.original_filename}"
         zip_path = os.path.join(tempfile.gettempdir(), zip_name)
         shutil.make_archive(zip_path, 'zip', export_dir)
-        return f"{zip_path}.zip", gr.update(interactive=False)
+        return f"{zip_path}.zip", gr.update(interactive=True)
 
     def handle_chatgpt(self, metrics, profile_km, profile_h):
         """Tạo URL Prompt tự động điền sẵn dữ liệu để gửi cho ChatGPT viết báo cáo."""
@@ -147,7 +147,7 @@ class AppController:
             )
             encoded_prompt = urllib.parse.quote(prompt)
             link = f'<a href="https://chatgpt.com/?prompt={encoded_prompt}" target="_blank" style="display:inline-block; padding:10px 15px; background-color:#10a37f; color:white; border-radius:5px; text-decoration:none; font-weight:bold; font-size:16px;">🚀 Mở ChatGPT và tự động dán Prompt này</a>'
-            return prompt, link, gr.update(interactive=False)
+            return prompt, link, gr.update(interactive=True)
         except Exception as e:
             return f"Lỗi: {e}", "", gr.update()
 
@@ -186,7 +186,7 @@ class AppController:
                 lines.append(" | ".join(v.ljust(col_widths[i]) for i, v in enumerate(row)))
             
             text_table = "\n".join(lines)
-            return text_table, gr.update(value="✅ Đã Copy & Khoá", interactive=False)
+            return text_table, gr.update(value="✅ Đã Copy", interactive=True)
         except Exception:
             # Fallback sang dạng string mặc định của pandas
-            return df.to_string(index=False), gr.update(value="✅ Đã Copy & Khoá", interactive=False)
+            return df.to_string(index=False), gr.update(value="✅ Đã Copy", interactive=True)
