@@ -152,41 +152,39 @@ class AppController:
             return f"Lỗi: {e}", "", gr.update()
 
     def handle_copy_table(self, df):
-        """Chuyển đổi DataFrame thành chuỗi văn bản (dạng bảng) để copy và khóa nút."""
+        """Chuyển đổi DataFrame thành chuỗi văn bản và HTML để copy đa định dạng (Rich Copy)."""
         if df is None:
-            return "", gr.update()
+            return "", "", gr.update()
             
         # Xử lý trường hợp Gradio truyền vào dict (thường gặp ở bản Gradio mới)
         if isinstance(df, dict):
             try:
                 df = pd.DataFrame(data=df.get('data', []), columns=df.get('headers', []))
             except:
-                return str(df), gr.update(value="✅ Đã Copy & Khoá", interactive=False)
+                return str(df), str(df), gr.update(value="✅ Đã Copy", interactive=True)
 
         if not isinstance(df, pd.DataFrame) or df.empty:
-            return "", gr.update()
+            return "", "", gr.update()
 
         try:
-            # Tạo chuỗi văn bản dạng bảng thủ công (để không phụ thuộc thư viện tabulate)
+            # 1. Tạo bản Plain Text (để dán vào Notepad)
             headers = [str(c) for c in df.columns]
             rows = [[str(v) for v in r] for r in df.values]
-            
-            # Tính độ rộng tối đa cho mỗi cột
             col_widths = [len(h) for h in headers]
             for row in rows:
                 for i, v in enumerate(row):
                     col_widths[i] = max(col_widths[i], len(v))
             
-            # Dựng bảng text
             lines = []
-            header_line = " | ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
-            lines.append(header_line)
+            lines.append(" | ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers)))
             lines.append("-+-".join("-" * col_widths[i] for i in range(len(headers))))
             for row in rows:
                 lines.append(" | ".join(v.ljust(col_widths[i]) for i, v in enumerate(row)))
-            
             text_table = "\n".join(lines)
-            return text_table, gr.update(value="✅ Đã Copy", interactive=True)
+            
+            # 2. Tạo bản HTML (để dán vào Word/Excel ra định dạng bảng chuẩn)
+            html_table = df.to_html(index=False, border=1)
+            
+            return text_table, html_table, gr.update(value="✅ Đã Copy", interactive=True)
         except Exception:
-            # Fallback sang dạng string mặc định của pandas
-            return df.to_string(index=False), gr.update(value="✅ Đã Copy", interactive=True)
+            return df.to_string(index=False), df.to_html(index=False, border=1), gr.update(value="✅ Đã Copy", interactive=True)

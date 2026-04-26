@@ -250,27 +250,40 @@ class ModelManager:
             ax2.set_title(f'Hierarchical (K={k_hierarchical}, {linkage_type}) - PCA')
             ax2.legend()
 
-        # ── Dendrogram (dùng k_hierarchical làm ngưỡng cắt) ─────────────────
-        fig_dendro, ax_dendro = plt.subplots(figsize=(12, 5), dpi=300)
-        fig_dendro.suptitle(
-            f"Hình 3: Dendrogram — K-Means={k_kmeans} | Hierarchical={k_hierarchical}",
-            fontsize=13, y=1.02)
+        # ── Dendrogram ───────────────────────────────────────────────────────
         Z = linkage(self.X_for_dendro, method=linkage_type)
-
-        if 1 < k_hierarchical <= len(Z):
+        
+        if k_kmeans == k_hierarchical:
+            fig_dendro, ax_dendro = plt.subplots(figsize=(12, 5), dpi=300)
+            fig_dendro.suptitle(f"Hình 3: Dendrogram — Ngưỡng cắt tối ưu (K={k_hierarchical})", fontsize=13, y=1.02)
+            
             cut_distance = (Z[-k_hierarchical, 2] + Z[-k_hierarchical+1, 2]) / 2.0
             dendrogram(Z, ax=ax_dendro, truncate_mode='lastp', p=30,
                        color_threshold=cut_distance, above_threshold_color='grey')
-            ax_dendro.axhline(y=cut_distance, color='red', linestyle='--', linewidth=2.5,
-                              label=f'Ngưỡng cắt Hierarchical (K={k_hierarchical})')
-            ax_dendro.legend(fontsize=11)
+            ax_dendro.axhline(y=cut_distance, color='red', linestyle='--', linewidth=2,
+                              label=f'Ngưỡng cắt (K={k_hierarchical})')
+            ax_dendro.legend(fontsize=10)
+            ax_dendro.set_title("Cấu trúc phân cấp dữ liệu", fontsize=11)
+            sns.despine(ax=ax_dendro)
         else:
-            dendrogram(Z, ax=ax_dendro, truncate_mode='lastp', p=30)
+            # Nếu 2 K khác nhau, vẽ 2 biểu đồ để so sánh
+            fig_dendro, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), dpi=300)
+            fig_dendro.suptitle(f"Hình 3: So sánh Dendrogram với K khác nhau", fontsize=14, y=1.05)
+            
+            # Subplot 1: K-Means K
+            cut_km = (Z[-k_kmeans, 2] + Z[-k_kmeans+1, 2]) / 2.0
+            dendrogram(Z, ax=ax1, truncate_mode='lastp', p=30, color_threshold=cut_km, above_threshold_color='grey')
+            ax1.axhline(y=cut_km, color='green', linestyle='--', label=f'Ngưỡng cắt K-Means (K={k_kmeans})')
+            ax1.set_title(f"(a) Theo K-Means (K={k_kmeans})")
+            ax1.legend(fontsize=9); sns.despine(ax=ax1)
+            
+            # Subplot 2: Hierarchical K
+            cut_h = (Z[-k_hierarchical, 2] + Z[-k_hierarchical+1, 2]) / 2.0
+            dendrogram(Z, ax=ax2, truncate_mode='lastp', p=30, color_threshold=cut_h, above_threshold_color='grey')
+            ax2.axhline(y=cut_h, color='red', linestyle='--', label=f'Ngưỡng cắt Hierarchical (K={k_hierarchical})')
+            ax2.set_title(f"(b) Theo Hierarchical (K={k_hierarchical})")
+            ax2.legend(fontsize=9); sns.despine(ax=ax2)
 
-        ax_dendro.set_title("(a) Cấu trúc phân cấp", fontsize=12)
-        ax_dendro.set_xlabel("Mẫu / Cụm", fontsize=11)
-        ax_dendro.set_ylabel("Khoảng cách (Distance)", fontsize=11)
-        sns.despine(ax=ax_dendro)
         fig_dendro.tight_layout(pad=2.0)
 
         # ── Bảng so sánh Metrics ─────────────────────────────────────────────

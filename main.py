@@ -30,11 +30,21 @@ sns.set_palette("colorblind")
 
 from app_controller import AppController
 
-js_copy = """
-(text) => {
-    if (text && text.trim().length > 0) {
+js_copy_rich = """
+(text, html) => {
+    if (!text || text.trim().length === 0) return;
+    try {
+        const typeHtml = "text/html";
+        const typeText = "text/plain";
+        const blobHtml = new Blob([html], { type: typeHtml });
+        const blobText = new Blob([text], { type: typeText });
+        const data = [new ClipboardItem({ [typeHtml]: blobHtml, [typeText]: blobText })];
+        navigator.clipboard.write(data).then(() => {
+            alert("📋 Đã copy bảng! Bạn có thể dán vào Word/Excel dưới định dạng bảng chuẩn.");
+        });
+    } catch (err) {
         navigator.clipboard.writeText(text).then(() => {
-            alert("📋 Đã sao chép dữ liệu bảng vào bộ nhớ tạm (dạng Tab-Separated, có thể dán trực tiếp vào Excel)!");
+            alert("📋 Đã sao chép (Dạng văn bản).");
         });
     }
 }
@@ -80,7 +90,8 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         raw_data_preview_tab2 = gr.DataFrame(label="Dữ liệu gốc (Xem trước 5 dòng)")
         with gr.Row():
             btn_copy_raw = gr.Button("📋 Copy bảng trên", variant="secondary", size="sm")
-            copy_buffer_raw = gr.Textbox(visible=False)
+            copy_buffer_raw_text = gr.Textbox(visible=False)
+            copy_buffer_raw_html = gr.Textbox(visible=False)
         with gr.Row():
             drop_cols = gr.CheckboxGroup(label="Chọn cột cần XOÁ (ID, User_ID, v.v.)")
             with gr.Column():
@@ -92,7 +103,8 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         preview_pre = gr.DataFrame(label="Dữ liệu sau xử lý (Xem trước)")
         with gr.Row():
             btn_copy_pre = gr.Button("📋 Copy bảng trên", variant="secondary", size="sm")
-            copy_buffer_pre = gr.Textbox(visible=False)
+            copy_buffer_pre_text = gr.Textbox(visible=False)
+            copy_buffer_pre_html = gr.Textbox(visible=False)
         
     with gr.Tab("3. Tìm K & Huấn luyện"):
         sys_info = gr.Textbox(value=get_sys_info(), label="Tài nguyên Server (Cập nhật Live)", interactive=False, max_lines=1)
@@ -106,7 +118,8 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
                 k_details = gr.DataFrame(label="Bảng chi tiết biểu quyết tìm K tối ưu")
                 with gr.Row():
                     btn_copy_k = gr.Button("📋 Copy bảng trên", variant="secondary", size="sm")
-                    copy_buffer_k = gr.Textbox(visible=False)
+                    copy_buffer_k_text = gr.Textbox(visible=False)
+                    copy_buffer_k_html = gr.Textbox(visible=False)
                 gr.Markdown("""
 **📌 Giải thích các chỉ số và biểu đồ:**
 - **Elbow Method (WCSS):** Thể hiện tổng bình phương khoảng cách từ các điểm dữ liệu đến tâm cụm. Điểm 'khuỷu tay' (nơi độ dốc giảm đột ngột) thường là K tốt.
@@ -150,7 +163,8 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         res_metrics = gr.DataFrame(label="Bảng so sánh hiệu năng")
         with gr.Row():
             btn_copy_metrics = gr.Button("📋 Copy bảng trên", variant="secondary", size="sm")
-            copy_buffer_metrics = gr.Textbox(visible=False)
+            copy_buffer_metrics_text = gr.Textbox(visible=False)
+            copy_buffer_metrics_html = gr.Textbox(visible=False)
 
     with gr.Tab("4. Đặc trưng & Xuất file"):
         gr.Markdown("""
@@ -165,12 +179,14 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
                 res_profile_km = gr.DataFrame(label="Đặc trưng cụm (K-Means)")
                 with gr.Row():
                     btn_copy_profile_km = gr.Button("📋 Copy bảng K-Means", variant="secondary", size="sm")
-                    copy_buffer_profile_km = gr.Textbox(visible=False)
+                    copy_buffer_km_text = gr.Textbox(visible=False)
+                    copy_buffer_km_html = gr.Textbox(visible=False)
             with gr.Column():
                 res_profile_h = gr.DataFrame(label="Đặc trưng cụm (Hierarchical)")
                 with gr.Row():
                     btn_copy_profile_h = gr.Button("📋 Copy bảng Hierarchical", variant="secondary", size="sm")
-                    copy_buffer_profile_h = gr.Textbox(visible=False)
+                    copy_buffer_h_text = gr.Textbox(visible=False)
+                    copy_buffer_h_html = gr.Textbox(visible=False)
         
         gr.Markdown("---")
         gr.Markdown("### 🤖 Trợ lý AI Viết Báo Cáo")
@@ -203,14 +219,14 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     btn_exp.click(controller.handle_export_all, outputs=[file_out, btn_exp])
 
     # Sự kiện Copy
-    btn_copy_raw.click(controller.handle_copy_table, inputs=[raw_data_preview_tab2], outputs=[copy_buffer_raw, btn_copy_raw]).then(fn=None, inputs=[copy_buffer_raw], outputs=None, js=js_copy)
-    btn_copy_pre.click(controller.handle_copy_table, inputs=[preview_pre], outputs=[copy_buffer_pre, btn_copy_pre]).then(fn=None, inputs=[copy_buffer_pre], outputs=None, js=js_copy)
-    btn_copy_k.click(controller.handle_copy_table, inputs=[k_details], outputs=[copy_buffer_k, btn_copy_k]).then(fn=None, inputs=[copy_buffer_k], outputs=None, js=js_copy)
-    btn_copy_metrics.click(controller.handle_copy_table, inputs=[res_metrics], outputs=[copy_buffer_metrics, btn_copy_metrics]).then(fn=None, inputs=[copy_buffer_metrics], outputs=None, js=js_copy)
-    btn_copy_profile_km.click(controller.handle_copy_table, inputs=[res_profile_km], outputs=[copy_buffer_profile_km, btn_copy_profile_km]).then(fn=None, inputs=[copy_buffer_profile_km], outputs=None, js=js_copy)
-    btn_copy_profile_h.click(controller.handle_copy_table, inputs=[res_profile_h], outputs=[copy_buffer_profile_h, btn_copy_profile_h]).then(fn=None, inputs=[copy_buffer_profile_h], outputs=None, js=js_copy)
+    btn_copy_raw.click(controller.handle_copy_table, inputs=[raw_data_preview_tab2], outputs=[copy_buffer_raw_text, copy_buffer_raw_html, btn_copy_raw]).then(fn=None, inputs=[copy_buffer_raw_text, copy_buffer_raw_html], outputs=None, js=js_copy_rich)
+    btn_copy_pre.click(controller.handle_copy_table, inputs=[preview_pre], outputs=[copy_buffer_pre_text, copy_buffer_pre_html, btn_copy_pre]).then(fn=None, inputs=[copy_buffer_pre_text, copy_buffer_pre_html], outputs=None, js=js_copy_rich)
+    btn_copy_k.click(controller.handle_copy_table, inputs=[k_details], outputs=[copy_buffer_k_text, copy_buffer_k_html, btn_copy_k]).then(fn=None, inputs=[copy_buffer_k_text, copy_buffer_k_html], outputs=None, js=js_copy_rich)
+    btn_copy_metrics.click(controller.handle_copy_table, inputs=[res_metrics], outputs=[copy_buffer_metrics_text, copy_buffer_metrics_html, btn_copy_metrics]).then(fn=None, inputs=[copy_buffer_metrics_text, copy_buffer_metrics_html], outputs=None, js=js_copy_rich)
+    btn_copy_profile_km.click(controller.handle_copy_table, inputs=[res_profile_km], outputs=[copy_buffer_km_text, copy_buffer_km_html, btn_copy_profile_km]).then(fn=None, inputs=[copy_buffer_km_text, copy_buffer_km_html], outputs=None, js=js_copy_rich)
+    btn_copy_profile_h.click(controller.handle_copy_table, inputs=[res_profile_h], outputs=[copy_buffer_h_text, copy_buffer_h_html, btn_copy_profile_h]).then(fn=None, inputs=[copy_buffer_h_text, copy_buffer_h_html], outputs=None, js=js_copy_rich)
     
-    btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy", interactive=True)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js=js_copy)
+    btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy", interactive=True)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js="(x) => { navigator.clipboard.writeText(x); alert('📋 Đã copy Prompt!'); }")
     
     if PSUTIL_AVAILABLE:
         timer = gr.Timer(2)
