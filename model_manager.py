@@ -42,13 +42,14 @@ class ModelManager:
         d2 = np.diff(wcss_norm, n=2)
         return int(np.argmax(d2))  # index trong K_range (bắt đầu từ k=2)
 
-    def analyze_k(self, processed_df):
+    def analyze_k(self, processed_df, n_trials=1):
         """
-        Hàm gộp: Tính toán một lần, trả về 2 K tối ưu riêng biệt cho K-Means và Hierarchical.
+        Hàm gộp: Tính toán N lần, trả về 2 K tối ưu trung bình cho K-Means và Hierarchical.
+        Việc chạy nhiều lần (N trials) giúp kết quả ổn định hơn, tránh sai số do khởi tạo ngẫu nhiên.
 
-        Lý do 2 K có thể khác nhau:
-        - K-Means: ưu tiên Silhouette ×2, CH ×2, Kneedle ×1 (cụm cầu, compact)
-        - Hierarchical: ưu tiên Davies-Bouldin ×2, Silhouette ×1, Kneedle ×1 (linh hoạt hình dạng)
+        Args:
+            processed_df (DataFrame): Dữ liệu đã tiền xử lý.
+            n_trials (int): Số lần chạy thử để lấy trung bình.
 
         Returns:
             tuple: (Figure, DataFrame chi tiết, int k_kmeans, int k_hierarchical)
@@ -67,43 +68,66 @@ class ModelManager:
         except ImportError:
             use_mini_batch = False
 
-        km1 = KMeans(n_clusters=1, init='k-means++', random_state=42, n_init=10)
-        km1.fit(X)
-        wcss_all = [km1.inertia_]
-        del km1
+        # Khởi tạo mảng lưu trữ kết quả cộng dồn
+        sum_wcss = np.zeros(len(range(1, limit)))
+        sum_sil = np.zeros(len(K_range))
+        sum_db = np.zeros(len(K_range))
+        sum_ch = np.zeros(len(K_range))
 
-        sil, db, ch, results = [], [], [], []
         sil_sample = 10000 if len(X) > 10000 else None
 
-        for k in K_range:
-            km = (MiniBatchKMeans(n_clusters=k, random_state=42, n_init=5, batch_size=2048)
-                  if use_mini_batch else
-                  KMeans(n_clusters=k, init='k-means++', random_state=42, n_init=10))
-            labels = km.fit_predict(X)
-            wcss_all.append(km.inertia_)
-            del km
-            s = silhouette_score(X, labels, sample_size=sil_sample, random_state=42)
-            d = davies_bouldin_score(X, labels)
-            c = calinski_harabasz_score(X, labels)
-            sil.append(s); db.append(d); ch.append(c)
-            results.append({'K': k, 'Silhouette (↑)': round(s, 4),
-                            'Davies-Bouldin (↓)': round(d, 4),
-                            'Calinski-Harabasz (↑)': round(c, 4)})
-            del labels
-            gc.collect()
+        for trial in range(n_trials):
+            seed = 42 + trial
+            
+            # WCSS cho K=1
+            km1 = KMeans(n_clusters=1, init='k-means++', random_state=seed, n_init=10)
+            km1.fit(X)
+            sum_wcss[0] += km1.inertia_
+            del km1
+
+            for i, k in enumerate(K_range):
+                km = (MiniBatchKMeans(n_clusters=k, random_state=seed, n_init=5, batch_size=2048)
+                      if use_mini_batch else
+                      KMeans(n_clusters=k, init='k-means++', random_state=seed, n_init=10))
+                labels = km.fit_predict(X)
+                sum_wcss[i+1] += km.inertia_
+                
+                sum_sil[i] += silhouette_score(X, labels, sample_size=sil_sample, random_state=seed)
+                sum_db[i] += davies_bouldin_score(X, labels)
+                sum_ch[i] += calinski_harabasz_score(X, labels)
+                
+                del km, labels
+                gc.collect()
+
+        # Tính trung bình
+        avg_wcss = sum_wcss / n_trials
+        avg_sil = sum_sil / n_trials
+        avg_db = sum_db / n_trials
+        avg_ch = sum_ch / n_trials
+
+        results = []
+        for i, k in enumerate(K_range):
+            results.append({
+                'K': k, 
+                'Silhouette (↑)': round(avg_sil[i], 4),
+                'Davies-Bouldin (↓)': round(avg_db[i], 4),
+                'Calinski-Harabasz (↑)': round(avg_ch[i], 4)
+            })
 
         res_df = pd.DataFrame(results)
         best_sil   = int(res_df.loc[res_df['Silhouette (↑)'].idxmax()]['K'])
         best_db    = int(res_df.loc[res_df['Davies-Bouldin (↓)'].idxmin()]['K'])
         best_ch    = int(res_df.loc[res_df['Calinski-Harabasz (↑)'].idxmax()]['K'])
-        elbow_idx  = self._detect_elbow_kneedle(wcss_all[1:])
+        
+        # Kneedle dùng WCSS trung bình
+        elbow_idx  = self._detect_elbow_kneedle(avg_wcss[1:])
         best_elbow = K_range[min(elbow_idx, len(K_range) - 1)]
 
-        # ── Voting K-Means: Silhouette×2, CH×2, Kneedle×1 ───────────────────
+        # ── Voting K-Means ──
         km_votes = Counter([best_sil, best_sil, best_ch, best_ch, best_elbow])
         k_kmeans = km_votes.most_common(1)[0][0]
 
-        # ── Voting Hierarchical: DB×2, Silhouette×1, Kneedle×1 ───────────────
+        # ── Voting Hierarchical ──
         h_votes = Counter([best_db, best_db, best_sil, best_elbow])
         k_hierarchical = h_votes.most_common(1)[0][0]
 
@@ -113,16 +137,17 @@ class ModelManager:
                             "Calinski-Harabasz Index", "Elbow (Kneedle)"],
             "Tiêu chí":   ["Càng cao càng tốt", "Càng thấp càng tốt",
                             "Càng cao càng tốt", "Điểm khuỷu tay WCSS"],
-            "K tốt nhất": [best_sil, best_db, best_ch, best_elbow],
+            "K tốt nhất (TB)": [best_sil, best_db, best_ch, best_elbow],
             f"K-Means ({k_kmeans})":        ["×2", "—",  "×2", "×1"],
             f"Hierarchical ({k_hierarchical})": ["×1", "×2", "—",  "×1"],
         })
 
-        # ── Biểu đồ: xanh lá = K-Means, đỏ = Hierarchical ──────────────────
+        # ── Biểu đồ ──
         fig, axes = plt.subplots(2, 2, figsize=(12, 9), dpi=300)
         axes = axes.flatten()
         fig.suptitle(
-            f"Hình 2: Phân tích K tối ưu — K-Means={k_kmeans}  |  Hierarchical={k_hierarchical}",
+            f"Hình 2: Phân tích K tối ưu (Trung bình qua {n_trials} lần thử)\n"
+            f"K-Means={k_kmeans}  |  Hierarchical={k_hierarchical}",
             fontsize=13, y=1.02)
 
         def _vlines(ax):
@@ -133,27 +158,27 @@ class ModelManager:
                            alpha=0.9, label=f'Hierarchical = {k_hierarchical}')
             ax.legend(fontsize=8)
 
-        axes[0].plot(range(1, limit), wcss_all, marker='o', color='#2c7bb6',
+        axes[0].plot(range(1, limit), avg_wcss, marker='o', color='#2c7bb6',
                      linewidth=2, markersize=6, markerfacecolor='white', markeredgewidth=1.5)
-        axes[0].set_title('(a) Elbow Method (WCSS)', fontsize=12)
+        axes[0].set_title('(a) Elbow Method (Avg WCSS)', fontsize=12)
         axes[0].set_xlabel('Số cụm K', fontsize=11); axes[0].set_ylabel('WCSS', fontsize=11)
         axes[0].grid(True, linestyle=':', alpha=0.6); _vlines(axes[0]); sns.despine(ax=axes[0])
 
-        axes[1].plot(K_range, sil, marker='s', color='#1a9641',
+        axes[1].plot(K_range, avg_sil, marker='s', color='#1a9641',
                      linewidth=2, markersize=6, markerfacecolor='white', markeredgewidth=1.5)
-        axes[1].set_title('(b) Silhouette Score', fontsize=12)
+        axes[1].set_title('(b) Avg Silhouette Score', fontsize=12)
         axes[1].set_xlabel('Số cụm K', fontsize=11); axes[1].set_ylabel('Score', fontsize=11)
         axes[1].grid(True, linestyle=':', alpha=0.6); _vlines(axes[1]); sns.despine(ax=axes[1])
 
-        axes[2].plot(K_range, db, marker='^', color='#d7191c',
+        axes[2].plot(K_range, avg_db, marker='^', color='#d7191c',
                      linewidth=2, markersize=6, markerfacecolor='white', markeredgewidth=1.5)
-        axes[2].set_title('(c) Davies-Bouldin Index', fontsize=12)
+        axes[2].set_title('(c) Avg Davies-Bouldin Index', fontsize=12)
         axes[2].set_xlabel('Số cụm K', fontsize=11); axes[2].set_ylabel('Index', fontsize=11)
         axes[2].grid(True, linestyle=':', alpha=0.6); _vlines(axes[2]); sns.despine(ax=axes[2])
 
-        axes[3].plot(K_range, ch, marker='D', color='#756bb1',
+        axes[3].plot(K_range, avg_ch, marker='D', color='#756bb1',
                      linewidth=2, markersize=6, markerfacecolor='white', markeredgewidth=1.5)
-        axes[3].set_title('(d) Calinski-Harabasz Index', fontsize=12)
+        axes[3].set_title('(d) Avg Calinski-Harabasz Index', fontsize=12)
         axes[3].set_xlabel('Số cụm K', fontsize=11); axes[3].set_ylabel('Score', fontsize=11)
         axes[3].grid(True, linestyle=':', alpha=0.6); _vlines(axes[3]); sns.despine(ax=axes[3])
 

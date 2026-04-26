@@ -43,13 +43,13 @@ class AppController:
         except Exception as e:
             return f"❌ Lỗi tiền xử lý: {str(e)}", None
 
-    def handle_elbow(self):
+    def handle_elbow(self, n_trials):
         """Vẽ biểu đồ và trả về 2 K tối ưu riêng biệt cho K-Means và Hierarchical."""
         if self.data_processor.processed_df is None:
             return None, pd.DataFrame(), "⚠️ Hãy thực hiện Tiền xử lý trước!", gr.update(), gr.update()
-        fig, detail_df, k_kmeans, k_hierarchical = self.model_manager.analyze_k(self.data_processor.processed_df)
+        fig, detail_df, k_kmeans, k_hierarchical = self.model_manager.analyze_k(self.data_processor.processed_df, n_trials=int(n_trials))
         self.fig_elbow = fig
-        msg = (f"📊 Đã tính toán. "
+        msg = (f"📊 Đã tính toán (TB qua {n_trials} lần). "
                f"K-Means → {k_kmeans} | Hierarchical → {k_hierarchical} "
                f"(Weighted Voting: Sil×2 • CH×2 • DB×2 • Kneedle×1)")
         return fig, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical)

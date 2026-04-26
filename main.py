@@ -82,6 +82,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         sys_info = gr.Textbox(value=get_sys_info(), label="Tài nguyên Server (Cập nhật Live)", interactive=False, max_lines=1)
         with gr.Row():
             with gr.Column():
+                n_trials_slider = gr.Slider(1, 10, 1, step=1, label="Số lần chạy thử (N trials) - Càng cao càng ổn định nhưng chạy lâu hơn")
                 btn_elbow = gr.Button("Bước 2: 🔍 Vẽ biểu đồ Elbow & Đánh giá tự động K", variant="secondary")
                 status_k = gr.Textbox(label="Kết quả gợi ý")
                 plot_elbow = gr.Plot()
@@ -155,7 +156,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     # Sự kiện
     file_in.change(controller.handle_load, inputs=[file_in], outputs=[preview_in, raw_data_preview_tab2, drop_cols, status_in, heatmap_out])
     btn_pre.click(controller.handle_preprocess, inputs=[drop_cols, imp_method, scl_method, out_check], outputs=[status_pre, preview_pre])
-    btn_elbow.click(controller.handle_elbow, outputs=[plot_elbow, k_details, status_k, k_kmeans_slider, k_hier_slider])
+    btn_elbow.click(controller.handle_elbow, inputs=[n_trials_slider], outputs=[plot_elbow, k_details, status_k, k_kmeans_slider, k_hier_slider])
     btn_train.click(controller.handle_train, inputs=[k_kmeans_slider, k_hier_slider, link_type], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile])
     btn_chatgpt.click(controller.handle_chatgpt, inputs=[res_metrics, res_profile], outputs=[chatgpt_prompt, chatgpt_link])
     btn_exp.click(controller.handle_export_all, outputs=[file_out])
