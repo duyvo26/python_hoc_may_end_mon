@@ -322,11 +322,13 @@ class ModelManager:
             ]
         })
 
-        # ── Profiling (dựa trên nhãn K-Means) ────────────────────────────────
+        # ── Profiling (dựa trên nhãn của cả 2 mô hình) ───────────────────────
         self.final_labeled_df = profile_base_df.copy()
         self.final_labeled_df['Cluster_KMeans'] = km_labels
         self.final_labeled_df['Cluster_Hierarchical'] = h_labels
-        profile_data = self.final_labeled_df.groupby('Cluster_KMeans').mean(numeric_only=True).reset_index()
+        
+        profile_km = self.final_labeled_df.groupby('Cluster_KMeans').mean(numeric_only=True).reset_index()
+        profile_h = self.final_labeled_df.groupby('Cluster_Hierarchical').mean(numeric_only=True).reset_index()
 
-        return fig_km, fig_h, fig_dendro, metrics, profile_data, self.final_labeled_df
+        return fig_km, fig_h, fig_dendro, metrics, profile_km, profile_h, self.final_labeled_df
 

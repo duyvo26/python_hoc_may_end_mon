@@ -21,13 +21,16 @@ class AppController:
         self.fig_h = None
         self.fig_dendro = None
         self.metrics = None
-        self.profile = None
+        self.profile_km = None
+        self.profile_h = None
+        self.original_filename = "Bao_Cao_Phan_Cum"
 
     def handle_load(self, file):
         """Xử lý sự kiện khi người dùng tải tệp CSV lên."""
         if file is None:
             return None, pd.DataFrame(), gr.update(choices=[]), "⚠️ Vui lòng tải lên file CSV.", None
         try:
+            self.original_filename = os.path.splitext(os.path.basename(file.name))[0]
             preview, cols, fig_corr = self.data_processor.load_data(file.name)
             self.fig_corr = fig_corr
             head5 = self.data_processor.df.head(5)
@@ -39,29 +42,29 @@ class AppController:
         """Xử lý sự kiện tiền xử lý dữ liệu từ Tab 2."""
         try:
             processed_df, _ = self.data_processor.preprocess_data(cols_to_drop, imputer_method, scaler_method, remove_outliers)
-            return f"✅ Tiền xử lý xong! Còn lại {len(processed_df)} dòng.", processed_df.head(10)
+            return f"✅ Tiền xử lý xong! Còn lại {len(processed_df)} dòng.", processed_df.head(10), gr.update(interactive=False)
         except Exception as e:
-            return f"❌ Lỗi tiền xử lý: {str(e)}", None
+            return f"❌ Lỗi tiền xử lý: {str(e)}", None, gr.update()
 
     def handle_elbow(self, n_trials):
         """Vẽ biểu đồ và trả về 2 K tối ưu riêng biệt cho K-Means và Hierarchical."""
         if self.data_processor.processed_df is None:
-            return None, pd.DataFrame(), "⚠️ Hãy thực hiện Tiền xử lý trước!", gr.update(), gr.update()
+            return None, pd.DataFrame(), "⚠️ Hãy thực hiện Tiền xử lý trước!", gr.update(), gr.update(), gr.update()
         fig, detail_df, k_kmeans, k_hierarchical = self.model_manager.analyze_k(self.data_processor.processed_df, n_trials=int(n_trials))
         self.fig_elbow = fig
         msg = (f"📊 Đã tính toán (TB qua {n_trials} lần). "
                f"K-Means → {k_kmeans} | Hierarchical → {k_hierarchical} "
                f"(Weighted Voting: Sil×2 • CH×2 • DB×2 • Kneedle×1)")
-        return fig, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical)
+        return fig, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical), gr.update(interactive=False)
 
     def handle_train(self, k_kmeans, k_hierarchical, linkage_type):
         """Chạy K-Means với k_kmeans và Hierarchical với k_hierarchical riêng biệt."""
         if self.data_processor.processed_df is None:
             err_df = pd.DataFrame({"Lỗi": ["⚠️ Hãy thực hiện Tiền xử lý trước."]})
-            return None, None, None, err_df, err_df
+            return None, None, None, err_df, err_df, err_df, gr.update()
         
         try:
-            fig_km, fig_h, fig_dendro, metrics, profile_data, _ = self.model_manager.run_clustering(
+            fig_km, fig_h, fig_dendro, metrics, profile_km, profile_h, _ = self.model_manager.run_clustering(
                 self.data_processor.processed_df, 
                 self.data_processor.profile_base_df, 
                 k_kmeans,
@@ -72,11 +75,12 @@ class AppController:
             self.fig_h = fig_h
             self.fig_dendro = fig_dendro
             self.metrics = metrics
-            self.profile = profile_data
-            return fig_km, fig_h, fig_dendro, metrics, profile_data
+            self.profile_km = profile_km
+            self.profile_h = profile_h
+            return fig_km, fig_h, fig_dendro, metrics, profile_km, profile_h, gr.update(interactive=False)
         except Exception as e:
             err_df = pd.DataFrame({"Lỗi": [f"❌ Lỗi: {str(e)}"]})
-            return None, None, None, err_df, err_df
+            return None, None, None, err_df, err_df, err_df, gr.update()
 
     def handle_export_all(self):
         """Đóng gói toàn bộ file dữ liệu và hình ảnh biểu đồ vào 1 file ZIP duy nhất để tải về."""
@@ -92,8 +96,10 @@ class AppController:
             self.model_manager.final_labeled_df.to_csv(os.path.join(export_dir, "3_data_clustered.csv"), index=False, encoding='utf-8-sig')
         if self.metrics is not None:
             self.metrics.to_csv(os.path.join(export_dir, "4_metrics.csv"), index=False, encoding='utf-8-sig')
-        if self.profile is not None:
-            self.profile.to_csv(os.path.join(export_dir, "5_profiling.csv"), index=False, encoding='utf-8-sig')
+        if self.profile_km is not None:
+            self.profile_km.to_csv(os.path.join(export_dir, "5_profiling_kmeans.csv"), index=False, encoding='utf-8-sig')
+        if self.profile_h is not None:
+            self.profile_h.to_csv(os.path.join(export_dir, "6_profiling_hierarchical.csv"), index=False, encoding='utf-8-sig')
             
         # Save Charts
         if self.fig_corr is not None:
@@ -115,26 +121,40 @@ class AppController:
             else:
                 self.fig_h.savefig(os.path.join(export_dir, "chart_5_hierarchical.png"), bbox_inches='tight')
                 
-        zip_path = os.path.join(tempfile.gettempdir(), "Bao_Cao_Phan_Cum")
+        zip_name = f"Bao_Cao_{self.original_filename}"
+        zip_path = os.path.join(tempfile.gettempdir(), zip_name)
         shutil.make_archive(zip_path, 'zip', export_dir)
-        return f"{zip_path}.zip"
+        return f"{zip_path}.zip", gr.update(interactive=False)
 
-    def handle_chatgpt(self, metrics, profile):
+    def handle_chatgpt(self, metrics, profile_km, profile_h):
         """Tạo URL Prompt tự động điền sẵn dữ liệu để gửi cho ChatGPT viết báo cáo."""
-        if metrics is None or profile is None or metrics.empty or profile.empty:
-            return "⚠️ Cần chạy mô hình so sánh trước để có số liệu.", ""
+        if metrics is None or profile_km is None or profile_h is None or metrics.empty:
+            return "⚠️ Cần chạy mô hình so sánh trước để có số liệu.", "", gr.update()
         try:
             metrics_str = metrics.to_string(index=False)
-            profile_str = profile.to_string(index=False)
+            profile_km_str = profile_km.to_string(index=False)
+            profile_h_str = profile_h.to_string(index=False)
             prompt = (
                 f"Đóng vai là một chuyên gia Data Science, hãy nhận xét các chỉ số phân cụm sau:\n\n"
-                f"1. Hiệu năng mô hình:\n{metrics_str}\n\n"
-                f"2. Đặc trưng của các cụm (K-Means):\n{profile_str}\n\n"
-                f"Dựa vào đó, hãy viết một đoạn báo cáo học thuật khoảng 300-500 từ đánh giá hiệu năng của K-Means và Hierarchical, "
-                f"đồng thời phân tích ý nghĩa và đặt tên cho từng cụm (dựa vào đặc trưng trung bình). Giọng văn học thuật, dùng cho báo cáo Thạc sĩ."
+                f"1. Hiệu năng so sánh mô hình:\n{metrics_str}\n\n"
+                f"2. Đặc trưng của các cụm (K-Means):\n{profile_km_str}\n\n"
+                f"3. Đặc trưng của các cụm (Hierarchical):\n{profile_h_str}\n\n"
+                f"Dựa vào đó, hãy viết một đoạn báo cáo học thuật khoảng 400-600 từ đánh giá hiệu năng so sánh giữa K-Means và Hierarchical, "
+                f"đồng thời phân tích ý nghĩa và gợi ý đặt tên cho từng cụm của cả 2 mô hình. Giọng văn học thuật, dùng cho báo cáo nghiên cứu."
             )
             encoded_prompt = urllib.parse.quote(prompt)
             link = f'<a href="https://chatgpt.com/?prompt={encoded_prompt}" target="_blank" style="display:inline-block; padding:10px 15px; background-color:#10a37f; color:white; border-radius:5px; text-decoration:none; font-weight:bold; font-size:16px;">🚀 Mở ChatGPT và tự động dán Prompt này</a>'
-            return prompt, link
+            return prompt, link, gr.update(interactive=False)
         except Exception as e:
-            return f"Lỗi: {e}", ""
+            return f"Lỗi: {e}", "", gr.update()
+
+    def handle_copy_table(self, df):
+        """Chuyển đổi DataFrame thành chuỗi để copy và khóa nút."""
+        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
+            return "", gr.update()
+        try:
+            # Chuyển sang CSV string để dễ dán vào Excel
+            csv_str = df.to_csv(index=False, sep='\t') # Dùng tab để dán vào Excel đẹp hơn
+            return csv_str, gr.update(value="✅ Đã Copy & Khoá", interactive=False)
+        except Exception:
+            return "", gr.update()
