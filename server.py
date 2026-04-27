@@ -274,4 +274,5 @@ def export_results(session_id):
     )
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Tắt use_reloader để tránh server tự khởi động lại làm mất task ngầm và dữ liệu
+    app.run(debug=True, use_reloader=False, port=5000)

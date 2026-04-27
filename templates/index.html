@@ -373,7 +373,13 @@
         let currentTaskId = null;
         let pollingTimer = null;
         let globalResults = null;
-        const sessionId = "sess_" + Math.random().toString(36).substr(2, 9);
+
+        // Khởi tạo hoặc khôi phục Session ID từ localStorage để tránh mất phiên khi F5
+        let sessionId = localStorage.getItem('clustering_session_id');
+        if (!sessionId) {
+            sessionId = "sess_" + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('clustering_session_id', sessionId);
+        }
         document.getElementById('session-display').innerText = sessionId;
 
         // Poll system info every 2s
@@ -401,13 +407,25 @@
         const fileInput = document.getElementById('csv_file');
         fileInput.onchange = async () => {
             if (!fileInput.files[0]) return;
+            
+            Swal.fire({ 
+                title: 'Đang nạp dữ liệu...', 
+                text: 'Hệ thống đang đọc file và phân tích tương quan. Vui lòng chờ...', 
+                allowOutsideClick: false, 
+                didOpen: () => Swal.showLoading() 
+            });
+
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
 
-            const res = await fetch('/api/upload', { method: 'POST', body: formData });
-            const data = await res.json();
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await res.json();
 
-            if (data.error) return Swal.fire('Lỗi', data.error, 'error');
+                if (data.error) {
+                    Swal.fire('Lỗi', data.error, 'error');
+                    return;
+                }
 
             // Render Preview Table
             if (data.preview_html) {
@@ -438,6 +456,10 @@
                 showConfirmButton: false
             });
             setTimeout(() => showTab('preprocess'), 1500);
+            
+            } catch (error) {
+                Swal.fire('Lỗi', 'Đã xảy ra lỗi kết nối với máy chủ. Vui lòng thử lại.', 'error');
+            }
         };
 
         // --- Step 2: Preprocess ---
