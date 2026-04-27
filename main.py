@@ -9,10 +9,7 @@ import ui_content as content
 setup_styles()
 controller = AppController()
 
-# Khởi tạo theme chuẩn
-theme_soft = gr.themes.Soft(primary_hue="blue")
-
-with gr.Blocks(theme=theme_soft) as demo:
+with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     with gr.Row():
         gr.Markdown(content.HEADER_MARKDOWN)
     
@@ -48,7 +45,7 @@ with gr.Blocks(theme=theme_soft) as demo:
             copy_buffer_pre_html = gr.Textbox(visible=False)
         
     with gr.Tab("3. Tìm K & Huấn luyện"):
-        sys_info = gr.Textbox(value=get_sys_info(), label="Tài nguyên Server", interactive=False, max_lines=1)
+        sys_info = gr.Textbox(value=get_sys_info(), label="Tài nguyên Server (Cập nhật Live)", interactive=False, max_lines=1)
         with gr.Row():
             with gr.Column():
                 n_trials_slider = gr.Slider(1, 10, 1, step=1, label="Số lần chạy thử (N trials) - Càng cao càng ổn định nhưng chạy lâu hơn")
@@ -72,7 +69,9 @@ with gr.Blocks(theme=theme_soft) as demo:
                     label="🔗 Phương pháp Linkage (Hierarchical)"
                 )
                 pca_dim_radio = gr.Radio(["2D", "3D"], value="3D", label="📐 Chiều không gian PCA (Visual)")
-                btn_train = gr.Button("Bước 3: 🚀 Chạy mô hình so sánh", variant="primary")
+                btn_train = gr.Button("Bước 3: 🚀 Bắt đầu Huấn luyện (Chạy ngầm)", variant="primary")
+                task_id_state = gr.State("")
+                status_task = gr.Textbox(label="Trạng thái Huấn luyện", interactive=False)
         
         with gr.Row():
             plot_cluster_km = gr.Plot(label="K-Means (PCA)", elem_id="train_results")
@@ -85,6 +84,14 @@ with gr.Blocks(theme=theme_soft) as demo:
             btn_copy_metrics = gr.Button("📋 Copy bảng trên", variant="secondary", size="sm")
             copy_buffer_metrics_text = gr.Textbox(visible=False)
             copy_buffer_metrics_html = gr.Textbox(visible=False)
+        
+        # Timer 5 giây để check status
+        timer_task = gr.Timer(5, active=False)
+        timer_task.tick(
+            controller.check_task_status, 
+            inputs=[task_id_state], 
+            outputs=[timer_task, status_task, plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile_km, res_profile_h]
+        )
 
     with gr.Tab("4. Đặc trưng & Xuất file"):
         gr.Markdown(content.TAB4_GUIDE)
@@ -134,7 +141,14 @@ with gr.Blocks(theme=theme_soft) as demo:
     
     btn_elbow.click(controller.handle_elbow, inputs=[n_trials_slider], outputs=[plot_elbow_km, plot_elbow_h, k_details, status_k, k_kmeans_slider, k_hier_slider, btn_elbow]).then(fn=None, inputs=None, outputs=None, js=get_scroll_js('elbow_results'))
     
-    btn_train.click(controller.handle_train, inputs=[k_kmeans_slider, k_hier_slider, link_type, pca_dim_radio], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile_km, res_profile_h, btn_train]).then(fn=None, inputs=None, outputs=None, js=get_scroll_js('train_results'))
+    btn_train.click(
+        controller.handle_train_async, 
+        inputs=[k_kmeans_slider, k_hier_slider, link_type, pca_dim_radio], 
+        outputs=[status_task, task_id_state]
+    ).then(
+        lambda: gr.update(active=True), 
+        outputs=[timer_task]
+    )
     
     btn_chatgpt.click(controller.handle_chatgpt, inputs=[res_metrics, res_profile_km, res_profile_h], outputs=[chatgpt_prompt, chatgpt_link, btn_chatgpt]).then(fn=None, inputs=None, outputs=None, js=get_scroll_js('prompt_results'))
     
@@ -150,5 +164,8 @@ with gr.Blocks(theme=theme_soft) as demo:
     
     btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy", interactive=True)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js="(x) => { navigator.clipboard.writeText(x); alert('📋 Đã copy Prompt!'); }")
     
+    timer = gr.Timer(2)
+    timer.tick(get_sys_info, outputs=[sys_info])
+
 if __name__ == "__main__":
-    demo.queue().launch(share=True, debug=True)
+    demo.launch(share=True)

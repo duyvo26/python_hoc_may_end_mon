@@ -7,14 +7,23 @@ import gradio as gr
 from data_processor import DataProcessor
 from model_manager import ModelManager
 
+import threading
+import uuid
+import time
+from datetime import datetime
+
 class AppController:
     """
-    Lớp điều khiển (Controller) dùng để kết nối giữa giao diện Gradio và phần xử lý logic (ModelManager, DataProcessor).
-    Lưu trữ trạng thái các biểu đồ và dữ liệu để phục vụ chức năng xuất báo cáo.
+    Lớp điều khiển (Controller) hỗ trợ xử lý Bất đồng bộ (Async) 
+    và quản lý trạng thái tác vụ huấn luyện.
     """
     def __init__(self):
         self.data_processor = DataProcessor()
         self.model_manager = ModelManager()
+        
+        # Trạng thái tác vụ
+        self.tasks = {} # {task_id: {"status": "running", "result": None}}
+        
         self.fig_corr = None
         self.fig_elbow_km = None
         self.fig_elbow_h = None
@@ -58,31 +67,67 @@ class AppController:
                f"K-Means → {k_kmeans} | Hierarchical → {k_hierarchical}")
         return fig_km, fig_h, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical), gr.update(interactive=True)
 
-    def handle_train(self, k_kmeans, k_hierarchical, linkage_type, pca_dim):
-        """Chạy K-Means với k_kmeans và Hierarchical với k_hierarchical riêng biệt."""
+    def handle_train_async(self, k_kmeans, k_hierarchical, linkage_type, pca_dim):
+        """Khởi chạy huấn luyện trong luồng nền (Background Thread)."""
         if self.data_processor.processed_df is None:
-            err_df = pd.DataFrame({"Lỗi": ["⚠️ Hãy thực hiện Tiền xử lý trước."]})
-            return None, None, None, err_df, err_df, err_df, gr.update()
+            return "❌ Lỗi: Hãy thực hiện Tiền xử lý trước!", ""
+
+        task_id = str(uuid.uuid4())[:8] # Tạo ID tác vụ rút gọn
+        self.tasks[task_id] = {"status": "running", "start_time": time.time(), "result": None}
+
+        def run_bg():
+            try:
+                # 1. Chạy huấn luyện
+                results = self.model_manager.run_clustering(
+                    self.data_processor.processed_df, 
+                    self.data_processor.profile_base_df, 
+                    k_kmeans, k_hierarchical, linkage_type, pca_dim
+                )
+                
+                # 2. Cập nhật kết quả vào Controller để hiển thị
+                self.fig_km, self.fig_h, self.fig_dendro, self.metrics, self.profile_km, self.profile_h, _ = results
+                
+                # 3. Tự động lưu vào folder 'results'
+                save_path = os.path.join(os.getcwd(), "results", f"Task_{task_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+                os.makedirs(save_path, exist_ok=True)
+                self.data_processor.processed_df.to_csv(os.path.join(save_path, "data_preprocessed.csv"), index=False)
+                self.model_manager.final_labeled_df.to_csv(os.path.join(save_path, "data_clustered.csv"), index=False)
+                
+                # Lưu biểu đồ (Nếu là Matplotlib)
+                for i, fig in enumerate([self.fig_km, self.fig_h, self.fig_dendro]):
+                    if not hasattr(fig, 'write_html'): # Matplotlib
+                        fig.savefig(os.path.join(save_path, f"chart_{i}.png"), bbox_inches='tight')
+
+                # 4. Đánh dấu hoàn tất
+                self.tasks[task_id]["status"] = "completed"
+                self.tasks[task_id]["result"] = results
+            except Exception as e:
+                self.tasks[task_id]["status"] = f"failed: {str(e)}"
+
+        thread = threading.Thread(target=run_bg)
+        thread.start()
         
-        try:
-            fig_km, fig_h, fig_dendro, metrics, profile_km, profile_h, _ = self.model_manager.run_clustering(
-                self.data_processor.processed_df, 
-                self.data_processor.profile_base_df, 
-                k_kmeans,
-                k_hierarchical,
-                linkage_type,
-                pca_dim
-            )
-            self.fig_km = fig_km
-            self.fig_h = fig_h
-            self.fig_dendro = fig_dendro
-            self.metrics = metrics
-            self.profile_km = profile_km
-            self.profile_h = profile_h
-            return fig_km, fig_h, fig_dendro, metrics, profile_km, profile_h, gr.update(interactive=True)
-        except Exception as e:
-            err_df = pd.DataFrame({"Lỗi": [f"❌ Lỗi: {str(e)}"]})
-            return None, None, None, err_df, err_df, err_df, gr.update()
+        return f"🚀 Đang huấn luyện... (Task ID: {task_id})", task_id
+
+    def check_task_status(self, task_id):
+        """Kiểm tra trạng thái tác vụ cho cơ chế Polling 5s."""
+        if not task_id or task_id not in self.tasks:
+            return gr.update(active=False), "⚠️ Không tìm thấy tác vụ", None, None, None, None, None, None
+
+        task = self.tasks[task_id]
+        if task["status"] == "running":
+            elapsed = int(time.time() - task["start_time"])
+            return gr.update(active=True), f"⏳ Đang xử lý... ({elapsed}s)", None, None, None, None, None, None
+        
+        if task["status"] == "completed":
+            res = task["result"]
+            # Trả về kết quả để hiển thị lên UI và TẮT Timer
+            return gr.update(active=False), f"✅ Hoàn tất (Task: {task_id})", res[0], res[1], res[2], res[3], res[4], res[5]
+        
+        if "failed" in task["status"]:
+            return gr.update(active=False), f"❌ Lỗi: {task['status']}", None, None, None, None, None, None
+        
+        return gr.update(active=False), "Chờ...", None, None, None, None, None, None
 
     def handle_export_all(self):
         """Đóng gói toàn bộ file dữ liệu và hình ảnh biểu đồ vào 1 file ZIP duy nhất để tải về."""
