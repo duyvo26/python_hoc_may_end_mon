@@ -22,7 +22,8 @@ from styles import setup_scientific_plots, get_sys_info
 app = Flask(__name__)
 setup_scientific_plots() # Áp dụng cấu hình biểu đồ chuẩn khoa học
 
-UPLOAD_FOLDER = 'uploads'
+BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Khởi tạo các module lõi
@@ -252,16 +253,18 @@ def get_prompt():
 
 @app.route('/api/export/<session_id>')
 def export_results(session_id):
-    # Thư mục lưu kết quả phiên làm việc
     session_dir = os.path.join(UPLOAD_FOLDER, session_id)
     
+    print(f"[EXPORT] Session dir: {session_dir}")
+    print(f"[EXPORT] Exists: {os.path.isdir(session_dir)}")
+    if os.path.isdir(session_dir):
+        print(f"[EXPORT] Files: {os.listdir(session_dir)}")
+    
     if not os.path.isdir(session_dir) or not os.listdir(session_dir):
-        return jsonify({"error": "Chưa có kết quả nào để xuất. Hãy chạy Phân tích hoặc Huấn luyện trước."}), 404
+        return jsonify({"error": f"Không tìm thấy kết quả cho phiên {session_id}. Hãy chạy Phân tích hoặc Huấn luyện trước."}), 404
     
     zip_name = f"Full_Report_{session_id}"
     zip_path = os.path.join(UPLOAD_FOLDER, zip_name)
-    
-    # Nén toàn bộ thư mục session
     shutil.make_archive(zip_path, 'zip', session_dir)
     
     return send_file(
