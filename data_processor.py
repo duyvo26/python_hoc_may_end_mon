@@ -20,7 +20,8 @@ class DataProcessor:
         """Nạp dữ liệu từ tệp CSV."""
         self.df = pd.read_csv(file_path)
         cols = self.df.columns.tolist()
-        preview = self.df.head(10).to_dict(orient='records')
+        # Chuyển đổi NaN thành None (thành null trong JSON) để tránh lỗi parse JSON ở Frontend
+        preview = self.df.head(10).replace({np.nan: None}).to_dict(orient='records')
         return preview, cols
 
     def plot_correlation(self):
