@@ -16,11 +16,9 @@ def setup_scientific_plots():
     sns.set_palette("colorblind")
 
 def get_sys_info():
-    """Lấy thông tin hệ thống cho Dashboard."""
+    """Lấy thông tin hệ thống cho Dashboard. Trả về dict {cpu, ram}."""
     try:
         import psutil
-        cpu = psutil.cpu_percent()
-        ram = psutil.virtual_memory().percent
-        return f"🖥️ CPU: {cpu}% | 🧠 RAM: {ram}%"
+        return {"cpu": psutil.cpu_percent(), "ram": psutil.virtual_memory().percent}
     except ImportError:
-        return "🖥️ CPU: --% | 🧠 RAM: --%"
+        return {"cpu": 0, "ram": 0}

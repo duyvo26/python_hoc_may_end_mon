@@ -23,11 +23,7 @@ app = Flask(__name__)
 setup_scientific_plots() # Áp dụng cấu hình biểu đồ chuẩn khoa học
 
 UPLOAD_FOLDER = 'uploads'
-RESULTS_FOLDER = 'results'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['RESULTS_FOLDER'] = RESULTS_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
 # Khởi tạo các module lõi
 processor = DataProcessor()
@@ -42,7 +38,8 @@ def index():
 
 @app.route('/api/sys-info')
 def sys_info_api():
-    return jsonify({"info": get_sys_info()})
+    info = get_sys_info()
+    return jsonify({"cpu": info.get("cpu", 0), "ram": info.get("ram", 0)})
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():

@@ -12,10 +12,19 @@ import plotly.graph_objects as go
 import gc
 
 class ModelManager:
+    """Quản lý toàn bộ quá trình phân cụm: phân tích K tối ưu và huấn luyện mô hình."""
+
     def __init__(self):
         self.results = {}
 
     def _detect_elbow_kneedle(self, wcss):
+        """Phát hiện điểm khuỷu tay (Elbow) tối ưu từ danh sách WCSS bằng thuật toán Kneedle.
+        
+        Args:
+            wcss (list): Danh sách giá trị WCSS tương ứng với mỗi K.
+        Returns:
+            int: Chỉ số (index) của K tối ưu trong danh sách.
+        """
         try:
             kn = KneeLocator(range(2, 2 + len(wcss)), wcss, curve='convex', direction='decreasing')
             return kn.elbow - 2 if kn.elbow else np.argmin(wcss)
@@ -23,6 +32,17 @@ class ModelManager:
             return np.argmin(wcss)
 
     def analyze_k(self, processed_df, n_trials=1):
+        """Phân tích và biểu quyết K tối ưu cho K-Means và Hierarchical Clustering.
+
+        Chạy n_trials lần, mỗi lần tính Elbow/Silhouette/DB/CH rồi biểu quyết
+        có trọng số để chọn K tốt nhất cho từng thuật toán.
+
+        Args:
+            processed_df (pd.DataFrame): Dữ liệu đã được chuẩn hóa.
+            n_trials (int): Số lần thử nghiệm để lấy kết quả biểu quyết ổn định hơn.
+        Returns:
+            tuple: (fig_km, fig_h, detail_df, msg, final_k_km, final_k_h, voting_history)
+        """
         X = processed_df.values.astype(np.float32)
         K_range = range(2, 11)
         km_final_votes = Counter()
@@ -88,6 +108,17 @@ class ModelManager:
         return fig_km, fig_h, detail_df, msg, final_k_km, final_k_h, voting_history
 
     def run_clustering(self, df, profile_df, k_km, k_h, linkage='ward'):
+        """Huấn luyện K-Means và Hierarchical Clustering, tạo trực quan PCA 2D/3D và Dendrogram.
+
+        Args:
+            df (pd.DataFrame): Dữ liệu đã chuẩn hóa để phân cụm.
+            profile_df (pd.DataFrame): Dữ liệu gốc (chưa chuẩn hóa) để tạo bảng profiling.
+            k_km (int): Số cụm cho K-Means.
+            k_h (int): Số cụm cho Hierarchical Clustering.
+            linkage (str): Phương pháp liên kết cho Hierarchical ('ward', 'complete', ...).
+        Returns:
+            dict: Chứa các hình ảnh PCA (2D/3D), Dendrogram, Metrics và Profile DataFrames.
+        """
         X = df.values.astype(np.float32)
         km = KMeans(n_clusters=k_km, n_init='auto', random_state=42).fit(X)
         hcl = AgglomerativeClustering(n_clusters=k_h, linkage=linkage).fit(X)
