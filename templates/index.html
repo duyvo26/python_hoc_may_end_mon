@@ -408,31 +408,58 @@
         fileInput.onchange = async () => {
             if (!fileInput.files[0]) return;
             
+            const file = fileInput.files[0];
+            const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            const fileId = "upload_" + Math.random().toString(36).substr(2, 9);
+            
             Swal.fire({ 
-                title: 'Đang nạp dữ liệu...', 
-                text: 'Hệ thống đang đọc file và phân tích tương quan. Vui lòng chờ...', 
+                title: 'Đang chuẩn bị nạp...', 
+                text: 'Hệ thống đang nạp dữ liệu. Vui lòng chờ...', 
                 allowOutsideClick: false, 
                 didOpen: () => Swal.showLoading() 
             });
 
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-
             try {
-                const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                const data = await res.json();
+                let finalData = null;
+                for (let i = 0; i < totalChunks; i++) {
+                    const start = i * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
+                    
+                    const formData = new FormData();
+                    formData.append('file', chunk);
+                    formData.append('chunkIndex', i);
+                    formData.append('totalChunks', totalChunks);
+                    formData.append('fileId', fileId);
+                    formData.append('fileName', file.name);
 
-                if (data.error) {
-                    Swal.fire('Lỗi', data.error, 'error');
-                    return;
+                    Swal.update({
+                        title: `Đang tải lên... ${Math.round(((i + 1) / totalChunks) * 100)}%`
+                    });
+
+                    const res = await fetch('/api/upload_chunk', { method: 'POST', body: formData });
+                    const data = await res.json();
+
+                    if (data.error) {
+                        Swal.fire('Lỗi', data.error, 'error');
+                        return;
+                    }
+                    if (data.status === 'completed') {
+                        finalData = data;
+                    }
                 }
 
-            // Render Preview Table
-            if (data.preview_html) {
-                document.getElementById('preview-table').innerHTML = `<div class="custom-scrollbar overflow-x-auto">${data.preview_html}</div>`;
-            } else {
-                renderTable('preview-table', data.preview);
-            }
+                if (!finalData) throw new Error("Upload failed to complete");
+
+                // Render Preview Table
+                if (finalData.preview_html) {
+                    document.getElementById('preview-table').innerHTML = `<div class="custom-scrollbar overflow-x-auto">${finalData.preview_html}</div>`;
+                } else {
+                    renderTable('preview-table', finalData.preview);
+                }
+                
+                const data = finalData;
 
             // Render Checkboxes
             const cbContainer = document.getElementById('cols-checkboxes');

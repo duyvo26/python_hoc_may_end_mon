@@ -42,29 +42,46 @@ def sys_info_api():
     info = get_sys_info()
     return jsonify({"cpu": info.get("cpu", 0), "ram": info.get("ram", 0)})
 
-@app.route('/api/upload', methods=['POST'])
-def upload_file():
+@app.route('/api/upload_chunk', methods=['POST'])
+def upload_chunk():
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
     
-    ext = file.filename.split('.')[-1].lower()
-    filename = f"{uuid.uuid4()}.{ext}"
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(filepath)
+    chunk = request.files['file']
+    chunk_index = int(request.form.get('chunkIndex', 0))
+    total_chunks = int(request.form.get('totalChunks', 1))
+    file_id = request.form.get('fileId', 'temp')
+    original_filename = request.form.get('fileName', 'data.csv')
     
-    preview, columns = processor.load_data(filepath)
-    if processor.df is None:
-        return jsonify({"error": "Không thể nạp dữ liệu"}), 400
+    temp_dir = os.path.join(UPLOAD_FOLDER, 'temp')
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, f"{file_id}.part")
     
-    return jsonify({
-        "message": "Upload thành công",
-        "columns": columns,
-        "preview": preview,
-        "filename": file.filename
-    })
+    # Ghi nối tiếp chunk vào file tạm
+    mode = 'ab' if chunk_index > 0 else 'wb'
+    with open(temp_path, mode) as f:
+        f.write(chunk.read())
+        
+    if chunk_index == total_chunks - 1:
+        # Khi đã nhận đủ chunk, đổi tên file và xử lý
+        ext = original_filename.split('.')[-1].lower()
+        final_filename = f"{uuid.uuid4()}.{ext}"
+        filepath = os.path.join(UPLOAD_FOLDER, final_filename)
+        shutil.move(temp_path, filepath)
+        
+        preview, columns = processor.load_data(filepath)
+        if processor.df is None:
+            return jsonify({"error": "Không thể nạp dữ liệu"}), 400
+        
+        return jsonify({
+            "status": "completed",
+            "message": "Upload thành công",
+            "columns": columns,
+            "preview": preview,
+            "filename": original_filename
+        })
+        
+    return jsonify({"status": "uploading"})
 
 @app.route('/api/heatmap', methods=['GET'])
 def get_heatmap():
