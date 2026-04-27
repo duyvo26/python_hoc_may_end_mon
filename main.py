@@ -5,11 +5,10 @@ from app_controller import AppController
 from styles import setup_styles, get_sys_info, JS_COPY_RICH, JS_SCROLL
 import ui_content as content
 
-# Khởi tạo styles và Controller
 setup_styles()
 controller = AppController()
 
-with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
+with gr.Blocks() as demo:
     with gr.Row():
         gr.Markdown(content.HEADER_MARKDOWN)
     
@@ -85,13 +84,8 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
             copy_buffer_metrics_text = gr.Textbox(visible=False)
             copy_buffer_metrics_html = gr.Textbox(visible=False)
         
-        # Timer 5 giây để check status
+        # Timer 5 giây để check status (Sẽ định nghĩa sự kiện ở cuối file)
         timer_task = gr.Timer(5, active=False)
-        timer_task.tick(
-            controller.check_task_status, 
-            inputs=[task_id_state], 
-            outputs=[timer_task, status_task, plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile_km, res_profile_h]
-        )
 
     with gr.Tab("4. Đặc trưng & Xuất file"):
         gr.Markdown(content.TAB4_GUIDE)
@@ -130,11 +124,17 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     with gr.Tab("5. 📚 Quy trình & Kỹ thuật"):
         gr.Markdown(content.TAB5_METHODOLOGY)
             
-    # Xử lý JS Scroll
+    # --- PHẦN ĐỊNH NGHĨA SỰ KIỆN (EVENTS) ---
     def get_scroll_js(element_id):
         return f"() => {{ const el = document.getElementById('{element_id}'); if (el) el.scrollIntoView({{behavior: 'smooth', block: 'center'}}); }}"
 
-    # Sự kiện
+    # Timer check status tác vụ huấn luyện
+    timer_task.tick(
+        controller.check_task_status, 
+        inputs=[task_id_state], 
+        outputs=[timer_task, status_task, plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile_km, res_profile_h]
+    )
+
     file_in.change(controller.handle_load, inputs=[file_in], outputs=[preview_in, raw_data_preview_tab2, drop_cols, status_in, heatmap_out])
     
     btn_pre.click(controller.handle_preprocess, inputs=[drop_cols, imp_method, scl_method, out_check], outputs=[status_pre, preview_pre, btn_pre]).then(fn=None, inputs=None, outputs=None, js=get_scroll_js('preprocess_results'))
@@ -161,6 +161,15 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     btn_copy_metrics.click(controller.handle_copy_table, inputs=[res_metrics], outputs=[copy_buffer_metrics_text, copy_buffer_metrics_html, btn_copy_metrics]).then(fn=None, inputs=[copy_buffer_metrics_text, copy_buffer_metrics_html], outputs=None, js=JS_COPY_RICH)
     btn_copy_profile_km.click(controller.handle_copy_table, inputs=[res_profile_km], outputs=[copy_buffer_km_text, copy_buffer_km_html, btn_copy_profile_km]).then(fn=None, inputs=[copy_buffer_km_text, copy_buffer_km_html], outputs=None, js=JS_COPY_RICH)
     btn_copy_profile_h.click(controller.handle_copy_table, inputs=[res_profile_h], outputs=[copy_buffer_h_text, copy_buffer_h_html, btn_copy_profile_h]).then(fn=None, inputs=[copy_buffer_h_text, copy_buffer_h_html], outputs=None, js=JS_COPY_RICH)
+    
+    btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy", interactive=True)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js="(x) => { navigator.clipboard.writeText(x); alert('📋 Đã copy Prompt!'); }")
+    
+    timer_sys = gr.Timer(2)
+    timer_sys.tick(get_sys_info, outputs=[sys_info])
+
+if __name__ == "__main__":
+    demo.launch(share=True, theme=gr.themes.Soft(primary_hue="blue"))
+html], outputs=None, js=JS_COPY_RICH)
     
     btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy", interactive=True)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js="(x) => { navigator.clipboard.writeText(x); alert('📋 Đã copy Prompt!'); }")
     
