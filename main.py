@@ -150,9 +150,13 @@ with gr.Blocks(theme=theme_soft) as demo:
     
     btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy", interactive=True)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js="(x) => { navigator.clipboard.writeText(x); alert('📋 Đã copy Prompt!'); }")
     
-    timer = gr.Timer(2)
-    timer.tick(get_sys_info, outputs=[sys_info])
+    # Đã bỏ Timer để tăng độ ổn định đường truyền
 
 if __name__ == "__main__":
-    # Bật queue để tránh bị ngắt kết nối khi xử lý lâu
-    demo.queue().launch(share=True, debug=True)
+    # Tối ưu kết nối cho môi trường Kaggle/Cloud
+    demo.queue(default_concurrency_limit=5).launch(
+        share=True, 
+        debug=True, 
+        max_threads=10,
+        show_error=True
+    )
