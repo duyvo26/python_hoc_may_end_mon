@@ -84,7 +84,6 @@ with gr.Blocks() as demo:
             copy_buffer_metrics_text = gr.Textbox(visible=False)
             copy_buffer_metrics_html = gr.Textbox(visible=False)
         
-        # Timer 5 giây để check status (Sẽ định nghĩa sự kiện ở cuối file)
         timer_task = gr.Timer(5, active=False)
 
     with gr.Tab("4. Đặc trưng & Xuất file"):
@@ -169,12 +168,3 @@ with gr.Blocks() as demo:
 
 if __name__ == "__main__":
     demo.launch(share=True, theme=gr.themes.Soft(primary_hue="blue"))
-html], outputs=None, js=JS_COPY_RICH)
-    
-    btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy", interactive=True)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js="(x) => { navigator.clipboard.writeText(x); alert('📋 Đã copy Prompt!'); }")
-    
-    timer = gr.Timer(2)
-    timer.tick(get_sys_info, outputs=[sys_info])
-
-if __name__ == "__main__":
-    demo.launch(share=True)
