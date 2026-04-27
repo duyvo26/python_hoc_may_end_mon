@@ -115,6 +115,11 @@ class ModelManager:
         avg_db_h = sum_db_h / n_trials
         avg_ch_h = sum_ch_h / n_trials
 
+        # Tìm K tốt nhất cho K-Means
+        best_sil_km = K_range[np.argmax(avg_sil_km)]
+        best_db_km = K_range[np.argmin(avg_db_km)]
+        best_ch_km = K_range[np.argmax(avg_ch_km)]
+        elbow_idx = self._detect_elbow_kneedle(avg_wcss_km)
         best_elbow_km = K_range[min(elbow_idx, len(K_range) - 1)]
         
         km_votes = Counter([best_sil_km, best_sil_km, best_ch_km, best_ch_km, best_elbow_km])
