@@ -119,9 +119,7 @@ def start_analyze_k():
                     out.append({"type": "image", "data": base64.b64encode(buf.read()).decode('utf-8')})
                 return out
 
-            plots_data = prepare_figs([fig_km, fig_h])
-
-            # Lưu file vào thư mục Session
+            # 1. Lưu file vào thư mục Session TRƯỚC (figure còn mở)
             session_dir = os.path.join(UPLOAD_FOLDER, sid_val)
             os.makedirs(session_dir, exist_ok=True)
             fig_km.savefig(os.path.join(session_dir, "1_Analysis_KMeans.png"), bbox_inches='tight', dpi=300)
@@ -129,6 +127,19 @@ def start_analyze_k():
             k_details.to_csv(os.path.join(session_dir, "1_K_Metrics_Detail.csv"), index=False)
             pd.DataFrame(v_hist).to_csv(os.path.join(session_dir, "1_Voting_History.csv"), index=False)
             processor.processed_df.to_csv(os.path.join(session_dir, "0_Processed_Data.csv"), index=False)
+
+            # 2. Convert sang base64 để gửi lên giao diện (đóng figure sau khi lưu xong)
+            def prepare_figs(figs):
+                out = []
+                for f in figs:
+                    buf = io.BytesIO()
+                    f.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+                    plt.close(f)
+                    buf.seek(0)
+                    out.append({"type": "image", "data": base64.b64encode(buf.read()).decode('utf-8')})
+                return out
+
+            plots_data = prepare_figs([fig_km, fig_h])
 
             result_data = {
                 "plot_km": plots_data[0],
