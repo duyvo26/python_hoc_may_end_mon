@@ -154,4 +154,5 @@ with gr.Blocks(theme=theme_soft) as demo:
     timer.tick(get_sys_info, outputs=[sys_info])
 
 if __name__ == "__main__":
-    demo.launch(share=True, debug=True)
+    # Bật queue để tránh bị ngắt kết nối khi xử lý lâu
+    demo.queue().launch(share=True, debug=True)
