@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from collections import Counter
 import gc
-from sklearn.cluster import KMeans, AgglomerativeClustering
+from sklearn.cluster import KMeans, AgglomerativeClustering, Birch, MiniBatchKMeans
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 from sklearn.decomposition import PCA
 from scipy.cluster.hierarchy import dendrogram, linkage
@@ -47,11 +47,21 @@ class ModelManager:
         Hàm phân tích: Tính toán các chỉ số Silhouette, DB, CH cho cả K-Means và Hierarchical.
         Trả về 2 biểu đồ riêng biệt để anh/chị dễ dàng quan sát điểm tối ưu của từng giải thuật.
         """
-        X = processed_df.values.astype(np.float32)
-        if len(X) < 3:
+        X_full = processed_df.values.astype(np.float32)
+        if len(X_full) < 3:
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, "Dữ liệu quá ít", ha='center')
             return fig, fig, pd.DataFrame([{"Lỗi": "Dữ liệu quá ít."}]), 2, 2
+
+        # --- Tối ưu RAM: Lấy mẫu nếu dữ liệu quá lớn (N > 10,000) ---
+        # Việc tìm K tối ưu không nhất thiết cần toàn bộ dữ liệu nếu dữ liệu đủ lớn.
+        MAX_SAMPLES = 10000 
+        if len(X_full) > MAX_SAMPLES:
+            np.random.seed(42)
+            idx = np.random.choice(len(X_full), MAX_SAMPLES, replace=False)
+            X = X_full[idx]
+        else:
+            X = X_full
 
         limit = min(11, len(X))
         K_range = list(range(2, limit))
@@ -67,7 +77,8 @@ class ModelManager:
         sum_db_h = np.zeros(len(K_range))
         sum_ch_h = np.zeros(len(K_range))
 
-        sil_sample = 10000 if len(X) > 10000 else None
+        # Silhouette score sample
+        sil_sample = 5000 if len(X) > 5000 else None
 
         for trial in range(n_trials):
             seed = 42 + trial
@@ -86,9 +97,10 @@ class ModelManager:
                 sum_db_km[i] += davies_bouldin_score(X, labels_km)
                 sum_ch_km[i] += calinski_harabasz_score(X, labels_km)
                 
-                # 2. Hierarchical Analysis
-                h = AgglomerativeClustering(n_clusters=k)
-                labels_h = h.fit_predict(X)
+                # 2. Hierarchical Analysis (Sử dụng BIRCH thay cho Agglomerative để tránh O(N^2) RAM)
+                # BIRCH xây dựng cây CF-Tree, cực kỳ hiệu quả cho dữ liệu lớn.
+                brc = Birch(n_clusters=k)
+                labels_h = brc.fit_predict(X)
                 sum_sil_h[i] += silhouette_score(X, labels_h, sample_size=sil_sample, random_state=seed)
                 sum_db_h[i] += davies_bouldin_score(X, labels_h)
                 sum_ch_h[i] += calinski_harabasz_score(X, labels_h)
@@ -103,17 +115,12 @@ class ModelManager:
         avg_db_h = sum_db_h / n_trials
         avg_ch_h = sum_ch_h / n_trials
 
-        # Tìm K tốt nhất cho K-Means
-        best_sil_km = K_range[np.argmax(avg_sil_km)]
-        best_db_km = K_range[np.argmin(avg_db_km)]
-        best_ch_km = K_range[np.argmax(avg_ch_km)]
-        elbow_idx = self._detect_elbow_kneedle(avg_wcss_km[1:])
         best_elbow_km = K_range[min(elbow_idx, len(K_range) - 1)]
         
         km_votes = Counter([best_sil_km, best_sil_km, best_ch_km, best_ch_km, best_elbow_km])
         k_kmeans = km_votes.most_common(1)[0][0]
 
-        # Tìm K tốt nhất cho Hierarchical
+        # Tìm K tốt nhất cho Hierarchical (Sử dụng BIRCH để tối ưu RAM và tốc độ)
         best_sil_h = K_range[np.argmax(avg_sil_h)]
         best_db_h = K_range[np.argmin(avg_db_h)]
         best_ch_h = K_range[np.argmax(avg_ch_h)]
@@ -129,7 +136,7 @@ class ModelManager:
         })
 
         # --- Biểu đồ 1: K-Means Analysis ---
-        fig_km, axes_km = plt.subplots(2, 2, figsize=(12, 8), dpi=300)
+        fig_km, axes_km = plt.subplots(2, 2, figsize=(12, 8), dpi=100) # Giảm DPI để tiết kiệm memory khi render
         fig_km.suptitle(f"Hình 2a: Phân tích K tối ưu cho K-Means (Gợi ý K={k_kmeans})", fontsize=14, y=1.02)
         axes_km = axes_km.flatten()
         
@@ -141,7 +148,7 @@ class ModelManager:
         fig_km.tight_layout()
 
         # --- Biểu đồ 2: Hierarchical Analysis ---
-        fig_h, axes_h = plt.subplots(1, 3, figsize=(15, 4.5), dpi=300)
+        fig_h, axes_h = plt.subplots(1, 3, figsize=(15, 4.5), dpi=100)
         fig_h.suptitle(f"Hình 2b: Phân tích K tối ưu cho Hierarchical (Gợi ý K={k_hierarchical})", fontsize=14, y=1.05)
         
         axes_h[0].plot(K_range, avg_sil_h, 's-', color='#1a9641'); axes_h[0].set_title('Silhouette Score')
@@ -184,21 +191,18 @@ class ModelManager:
             kmeans = KMeans(n_clusters=k_kmeans, random_state=42, n_init=10)
         km_labels = kmeans.fit_predict(X)
 
-        # ── Hierarchical + KNN Approximation nếu N > 15,000 ──────────────────
-        if len(X) > 15000:
+        # ── Hierarchical sử dụng BIRCH (Chuẩn cho dữ liệu lớn) ───────────────
+        # BIRCH thực hiện phân cụm phân cấp thông qua cấu trúc cây CF-Tree,
+        # cho phép xử lý hàng triệu dòng dữ liệu mà vẫn giữ tính chất Hierarchical.
+        birch_model = Birch(n_clusters=k_hierarchical)
+        h_labels = birch_model.fit_predict(X)
+        
+        # Để vẽ Dendrogram, chúng ta vẫn cần một mẫu dữ liệu (vì Dendrogram không thể vẽ cho 100k điểm)
+        if len(X) > 5000:
             np.random.seed(42)
-            indices = np.random.choice(len(X), 15000, replace=False)
-            X_sample_h = X[indices]
-            hierarchical = AgglomerativeClustering(n_clusters=k_hierarchical, linkage=linkage_type)
-            h_labels_sample = hierarchical.fit_predict(X_sample_h)
-            from sklearn.neighbors import KNeighborsClassifier
-            knn = KNeighborsClassifier(n_neighbors=5)
-            knn.fit(X_sample_h, h_labels_sample)
-            h_labels = knn.predict(X)
-            self.X_for_dendro = X_sample_h
+            indices = np.random.choice(len(X), 5000, replace=False)
+            self.X_for_dendro = X[indices]
         else:
-            hierarchical = AgglomerativeClustering(n_clusters=k_hierarchical, linkage=linkage_type)
-            h_labels = hierarchical.fit_predict(X)
             self.X_for_dendro = X
 
         # ── PCA giảm chiều (dùng max của 2 K để đủ trục) ─────────────────────
