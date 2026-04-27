@@ -48,7 +48,7 @@ with gr.Blocks(theme=theme_soft) as demo:
             copy_buffer_pre_html = gr.Textbox(visible=False)
         
     with gr.Tab("3. Tìm K & Huấn luyện"):
-        sys_info = gr.Textbox(value=get_sys_info(), label="Tài nguyên Server (Cập nhật Live)", interactive=False, max_lines=1)
+        sys_info = gr.Textbox(value=get_sys_info(), label="Tài nguyên Server", interactive=False, max_lines=1)
         with gr.Row():
             with gr.Column():
                 n_trials_slider = gr.Slider(1, 10, 1, step=1, label="Số lần chạy thử (N trials) - Càng cao càng ổn định nhưng chạy lâu hơn")
@@ -150,13 +150,5 @@ with gr.Blocks(theme=theme_soft) as demo:
     
     btn_copy_prompt.click(lambda x: (x, gr.update(value="✅ Đã Copy", interactive=True)), inputs=[chatgpt_prompt], outputs=[copy_buffer_prompt, btn_copy_prompt]).then(fn=None, inputs=[copy_buffer_prompt], outputs=None, js="(x) => { navigator.clipboard.writeText(x); alert('📋 Đã copy Prompt!'); }")
     
-    # Đã bỏ Timer để tăng độ ổn định đường truyền
-
 if __name__ == "__main__":
-    # Tối ưu kết nối cho môi trường Kaggle/Cloud
-    demo.queue(default_concurrency_limit=5).launch(
-        share=True, 
-        debug=True, 
-        max_threads=10,
-        show_error=True
-    )
+    demo.queue().launch(share=True, debug=True)
