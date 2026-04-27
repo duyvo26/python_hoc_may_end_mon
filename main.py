@@ -121,18 +121,19 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         gr.Markdown(content.TAB5_METHODOLOGY)
             
     # Xử lý JS Scroll
-    scroll_js_code = f"() => {{ {JS_SCROLL.replace('(id) =>', '').strip('{} ')}('ID_PLACEHOLDER'); }}"
+    def get_scroll_js(element_id):
+        return f"() => {{ const el = document.getElementById('{element_id}'); if (el) el.scrollIntoView({{behavior: 'smooth', block: 'center'}}); }}"
 
     # Sự kiện
     file_in.change(controller.handle_load, inputs=[file_in], outputs=[preview_in, raw_data_preview_tab2, drop_cols, status_in, heatmap_out])
     
-    btn_pre.click(controller.handle_preprocess, inputs=[drop_cols, imp_method, scl_method, out_check], outputs=[status_pre, preview_pre, btn_pre]).then(fn=None, inputs=None, outputs=None, js=scroll_js_code.replace('ID_PLACEHOLDER', 'preprocess_results'))
+    btn_pre.click(controller.handle_preprocess, inputs=[drop_cols, imp_method, scl_method, out_check], outputs=[status_pre, preview_pre, btn_pre]).then(fn=None, inputs=None, outputs=None, js=get_scroll_js('preprocess_results'))
     
-    btn_elbow.click(controller.handle_elbow, inputs=[n_trials_slider], outputs=[plot_elbow_km, plot_elbow_h, k_details, status_k, k_kmeans_slider, k_hier_slider, btn_elbow]).then(fn=None, inputs=None, outputs=None, js=scroll_js_code.replace('ID_PLACEHOLDER', 'elbow_results'))
+    btn_elbow.click(controller.handle_elbow, inputs=[n_trials_slider], outputs=[plot_elbow_km, plot_elbow_h, k_details, status_k, k_kmeans_slider, k_hier_slider, btn_elbow]).then(fn=None, inputs=None, outputs=None, js=get_scroll_js('elbow_results'))
     
-    btn_train.click(controller.handle_train, inputs=[k_kmeans_slider, k_hier_slider, link_type, pca_dim_radio], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile_km, res_profile_h, btn_train]).then(fn=None, inputs=None, outputs=None, js=scroll_js_code.replace('ID_PLACEHOLDER', 'train_results'))
+    btn_train.click(controller.handle_train, inputs=[k_kmeans_slider, k_hier_slider, link_type, pca_dim_radio], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile_km, res_profile_h, btn_train]).then(fn=None, inputs=None, outputs=None, js=get_scroll_js('train_results'))
     
-    btn_chatgpt.click(controller.handle_chatgpt, inputs=[res_metrics, res_profile_km, res_profile_h], outputs=[chatgpt_prompt, chatgpt_link, btn_chatgpt]).then(fn=None, inputs=None, outputs=None, js=scroll_js_code.replace('ID_PLACEHOLDER', 'prompt_results'))
+    btn_chatgpt.click(controller.handle_chatgpt, inputs=[res_metrics, res_profile_km, res_profile_h], outputs=[chatgpt_prompt, chatgpt_link, btn_chatgpt]).then(fn=None, inputs=None, outputs=None, js=get_scroll_js('prompt_results'))
     
     btn_exp.click(controller.handle_export_all, outputs=[file_out, btn_exp])
 
