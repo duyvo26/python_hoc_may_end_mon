@@ -114,7 +114,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
                 btn_elbow = gr.Button("Bước 2: 🔍 Vẽ biểu đồ Elbow & Đánh giá tự động K", variant="secondary")
                 status_k = gr.Textbox(label="Kết quả gợi ý")
                 plot_elbow_km = gr.Plot(label="Phân tích K-Means (Elbow, Sil, DB, CH)")
-                plot_elbow_h = gr.Plot(label="Phân tích Hierarchical (Sil, DB, CH)")
+                plot_elbow_h = gr.Plot(label="Phân tích Hierarchical - BIRCH (Sil, DB, CH)")
                 k_details = gr.DataFrame(label="Bảng chi tiết biểu quyết tìm K tối ưu")
                 with gr.Row():
                     btn_copy_k = gr.Button("📋 Copy bảng trên", variant="secondary", size="sm")
@@ -143,7 +143,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
 | **centroid** | Khoảng cách tậm cụm | Trực quan | Có thể bj đảo ngược |
                 """)
                 k_kmeans_slider = gr.Slider(2, 10, 3, step=1, label="🟢 K cho K-Means (tự điều chỉnh sau khi tìm K)")
-                k_hier_slider = gr.Slider(2, 10, 3, step=1, label="🔴 K cho Hierarchical (tự điều chỉnh sau khi tìm K)")
+                k_hier_slider = gr.Slider(2, 10, 3, step=1, label="🔴 K cho Hierarchical - BIRCH")
                 link_type = gr.Dropdown(
                     ["ward", "complete", "average", "single", "weighted", "centroid"],
                     value="ward",
@@ -158,7 +158,9 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
             plot_dendro = gr.Plot(label="Biểu đồ Dendrogram")
         gr.Markdown("""
 > 📌 **Đọc kết quả:** Biểu đồ 3D PCA chiếu dữ liệu xuống không gian 3 chiều để trực quan hoá các cụm.
-> Tâm cụm được đánh dấu bằng dấu **✕ đỏ đậm**. Đường nét đứt đỏ trên Dendrogram là ngưỡng cắt tương ứng với K đã chọn.
+> Tâm cụm được đánh dấu bằng dấu **✕ đỏ đậm**. 
+> **Lưu ý:** Thuật toán **BIRCH** được sử dụng cho lộ trình Hierarchical giúp hệ thống xử lý mượt mà hàng triệu bản ghi mà không gây tràn RAM.
+> Đường nét đứt đỏ trên Dendrogram là ngưỡng cắt tương ứng với K đã chọn (vẽ trên mẫu đại diện).
         """)
         res_metrics = gr.DataFrame(label="Bảng so sánh hiệu năng")
         with gr.Row():
@@ -182,9 +184,9 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
                     copy_buffer_km_text = gr.Textbox(visible=False)
                     copy_buffer_km_html = gr.Textbox(visible=False)
             with gr.Column():
-                res_profile_h = gr.DataFrame(label="Đặc trưng cụm (Hierarchical)")
+                res_profile_h = gr.DataFrame(label="Đặc trưng cụm (Hierarchical - BIRCH)")
                 with gr.Row():
-                    btn_copy_profile_h = gr.Button("📋 Copy bảng Hierarchical", variant="secondary", size="sm")
+                    btn_copy_profile_h = gr.Button("📋 Copy bảng BIRCH", variant="secondary", size="sm")
                     copy_buffer_h_text = gr.Textbox(visible=False)
                     copy_buffer_h_html = gr.Textbox(visible=False)
         
