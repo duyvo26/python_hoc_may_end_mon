@@ -58,7 +58,7 @@ class AppController:
                f"K-Means → {k_kmeans} | Hierarchical → {k_hierarchical}")
         return fig_km, fig_h, detail_df, msg, gr.update(value=k_kmeans), gr.update(value=k_hierarchical), gr.update(interactive=True)
 
-    def handle_train(self, k_kmeans, k_hierarchical, linkage_type):
+    def handle_train(self, k_kmeans, k_hierarchical, linkage_type, pca_dim):
         """Chạy K-Means với k_kmeans và Hierarchical với k_hierarchical riêng biệt."""
         if self.data_processor.processed_df is None:
             err_df = pd.DataFrame({"Lỗi": ["⚠️ Hãy thực hiện Tiền xử lý trước."]})
@@ -70,7 +70,8 @@ class AppController:
                 self.data_processor.profile_base_df, 
                 k_kmeans,
                 k_hierarchical,
-                linkage_type
+                linkage_type,
+                pca_dim
             )
             self.fig_km = fig_km
             self.fig_h = fig_h

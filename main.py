@@ -100,7 +100,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
                 out_check = gr.Checkbox(label="Loại bỏ nhiễu (Z-Score > 3)", value=True)
         btn_pre = gr.Button("Bước 1: ⚙️ Chạy Tiền xử lý", variant="primary")
         status_pre = gr.Textbox(label="Kết quả")
-        preview_pre = gr.DataFrame(label="Dữ liệu sau xử lý (Xem trước)")
+        preview_pre = gr.DataFrame(label="Dữ liệu sau xử lý (Xem trước)", elem_id="preprocess_results")
         with gr.Row():
             btn_copy_pre = gr.Button("📋 Copy bảng trên", variant="secondary", size="sm")
             copy_buffer_pre_text = gr.Textbox(visible=False)
@@ -113,7 +113,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
                 n_trials_slider = gr.Slider(1, 10, 1, step=1, label="Số lần chạy thử (N trials) - Càng cao càng ổn định nhưng chạy lâu hơn")
                 btn_elbow = gr.Button("Bước 2: 🔍 Vẽ biểu đồ Elbow & Đánh giá tự động K", variant="secondary")
                 status_k = gr.Textbox(label="Kết quả gợi ý")
-                plot_elbow_km = gr.Plot(label="Phân tích K-Means (Elbow, Sil, DB, CH)")
+                plot_elbow_km = gr.Plot(label="Phân tích K-Means (Elbow, Sil, DB, CH)", elem_id="elbow_results")
                 plot_elbow_h = gr.Plot(label="Phân tích Hierarchical - BIRCH (Sil, DB, CH)")
                 k_details = gr.DataFrame(label="Bảng chi tiết biểu quyết tìm K tối ưu")
                 with gr.Row():
@@ -149,16 +149,18 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
                     value="ward",
                     label="🔗 Phương pháp Linkage (Hierarchical)"
                 )
+                pca_dim_radio = gr.Radio(["2D", "3D"], value="3D", label="📐 Chiều không gian PCA (Visual)")
                 btn_train = gr.Button("Bước 3: 🚀 Chạy mô hình so sánh", variant="primary")
         
         with gr.Row():
-            plot_cluster_km = gr.Plot(label="K-Means (PCA)")
+            plot_cluster_km = gr.Plot(label="K-Means (PCA)", elem_id="train_results")
             plot_cluster_h = gr.Plot(label="Hierarchical (PCA)")
         with gr.Row():
             plot_dendro = gr.Plot(label="Biểu đồ Dendrogram")
         gr.Markdown("""
-> 📌 **Đọc kết quả:** Biểu đồ 3D PCA chiếu dữ liệu xuống không gian 3 chiều để trực quan hoá các cụm.
-> Tâm cụm được đánh dấu bằng dấu **✕ đỏ đậm**. 
+> 📌 **Đọc kết quả:** Biểu đồ PCA chiếu dữ liệu xuống không gian 2D hoặc 3D để trực quan hoá các cụm.
+> Bạn có thể xoay, phóng to/thu nhỏ trên biểu đồ để quan sát rõ hơn.
+> Tâm cụm được đánh dấu bằng dấu **✕** hoặc **Kim cương đỏ**. 
 > **Lưu ý:** Thuật toán **BIRCH** được sử dụng cho lộ trình Hierarchical giúp hệ thống xử lý mượt mà hàng triệu bản ghi mà không gây tràn RAM.
 > Đường nét đứt đỏ trên Dendrogram là ngưỡng cắt tương ứng với K đã chọn (vẽ trên mẫu đại diện).
         """)
@@ -195,7 +197,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         with gr.Row():
             btn_chatgpt = gr.Button("Bước 4: 🧠 Khởi tạo Prompt cho ChatGPT", variant="secondary")
         with gr.Row():
-            chatgpt_prompt = gr.Textbox(label="Nội dung Prompt (Có thể copy tay)", lines=5)
+            chatgpt_prompt = gr.Textbox(label="Nội dung Prompt (Có thể copy tay)", lines=5, elem_id="prompt_results")
             with gr.Column():
                 btn_copy_prompt = gr.Button("📋 Copy Prompt", variant="secondary", size="sm")
                 copy_buffer_prompt = gr.Textbox(visible=False)
@@ -206,17 +208,56 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         gr.Markdown("Bấm nút dưới đây để tải về một file nén (.zip) chứa tất cả: Dữ liệu gốc, Dữ liệu sau xử lý, Kết quả gán nhãn cụm, Bảng đánh giá, cùng với **Tất cả các hình ảnh biểu đồ**.")
         btn_exp = gr.Button("Bước 5: 💾 Tải Full Báo Cáo (.ZIP)", variant="primary")
         file_out = gr.File(label="File Tổng hợp Báo cáo")
+
+    with gr.Tab("5. 📚 Quy trình & Kỹ thuật"):
+        gr.Markdown("""
+## 🛠️ Quy trình Xử lý & Các Kỹ thuật áp dụng (Methodology)
+
+Hệ thống được thiết kế theo tiêu chuẩn **Pipeline Khoa học Dữ liệu** chuyên nghiệp, tích hợp các kỹ thuật tối ưu hóa cho dữ liệu lớn.
+
+### 1. Luồng xử lý (Data Workflow)
+```mermaid
+graph LR
+    A[Dữ liệu gốc] --> B[Tiền xử lý & Chuẩn hoá]
+    B --> C[Phân tích K tối ưu]
+    C --> D[Huấn luyện So sánh]
+    D --> E[PCA Giảm chiều]
+    E --> F[Profiling & Xuất báo cáo]
+```
+
+### 2. Các kỹ thuật & Thuật toán then chốt
+| Giai đoạn | Kỹ thuật áp dụng | Mục đích |
+| :--- | :--- | :--- |
+| **Tiền xử lý** | `StandardScaler` / `MinMaxScaler` | Đưa dữ liệu về cùng thang đo, tránh thiên kiến cho các biến có giá trị lớn. |
+| **Xử lý Nhiễu** | `Z-Score Outlier Detection` | Loại bỏ các điểm dữ liệu bất thường (Z > 3) để tăng độ ổn định của tâm cụm. |
+| **Tìm K tối ưu** | `Kneedle Algorithm` | Tự động xác định điểm "Khuỷu tay" (Elbow) bằng toán học thay vì nhìn bằng mắt. |
+| **Biểu quyết K** | `Weighted Voting System` | Kết hợp 4 chỉ số (Sil, DB, CH, Elbow) với trọng số tùy chỉnh để tìm K khách quan nhất. |
+| **K-Means** | `MiniBatchKMeans` | Tự động kích hoạt khi dữ liệu > 25,000 dòng để tối ưu tốc độ và RAM. |
+| **Hierarchical** | `BIRCH Algorithm` | Giải pháp thay thế cho Agglomerative truyền thống, giúp phân cụm phân cấp trên hàng triệu dòng dữ liệu. |
+| **Giảm chiều** | `PCA (Principal Component Analysis)` | Chiếu dữ liệu đa chiều xuống không gian 2D/3D mà vẫn giữ được đặc trưng chính (variance). |
+
+### 3. Cơ sở khoa học của các chỉ số Đánh giá
+Hệ thống sử dụng các minh chứng khoa học từ các công trình nghiên cứu kinh điển:
+*   **Silhouette Score:** (Rousseeuw, 1987) - Đo lường độ chặt chẽ và tách biệt.
+*   **Davies-Bouldin Index:** (Davies & Bouldin, 1979) - Tỷ lệ phân tán và khoảng cách.
+*   **Calinski-Harabasz:** (Caliński & Harabasz, 1974) - Tỷ lệ phương sai nội cụm và ngoại cụm.
+
+> 💡 **Lưu ý:** Tất cả các ngưỡng lấy mẫu và trọng số biểu quyết đều có thể được tinh chỉnh trong file cấu hình hệ thống (`.env`).
+        """)
             
+    # JS Scroll function
+    js_scroll = "(id) => { setTimeout(() => { const el = document.getElementById(id); if (el) el.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 100); }"
+
     # Sự kiện
     file_in.change(controller.handle_load, inputs=[file_in], outputs=[preview_in, raw_data_preview_tab2, drop_cols, status_in, heatmap_out])
     
-    btn_pre.click(controller.handle_preprocess, inputs=[drop_cols, imp_method, scl_method, out_check], outputs=[status_pre, preview_pre, btn_pre])
+    btn_pre.click(controller.handle_preprocess, inputs=[drop_cols, imp_method, scl_method, out_check], outputs=[status_pre, preview_pre, btn_pre]).then(fn=None, inputs=None, outputs=None, js=f"() => {{ {js_scroll.replace('(id) =>', '').strip('{} ')}('preprocess_results'); }}")
     
-    btn_elbow.click(controller.handle_elbow, inputs=[n_trials_slider], outputs=[plot_elbow_km, plot_elbow_h, k_details, status_k, k_kmeans_slider, k_hier_slider, btn_elbow])
+    btn_elbow.click(controller.handle_elbow, inputs=[n_trials_slider], outputs=[plot_elbow_km, plot_elbow_h, k_details, status_k, k_kmeans_slider, k_hier_slider, btn_elbow]).then(fn=None, inputs=None, outputs=None, js=f"() => {{ {js_scroll.replace('(id) =>', '').strip('{} ')}('elbow_results'); }}")
     
-    btn_train.click(controller.handle_train, inputs=[k_kmeans_slider, k_hier_slider, link_type], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile_km, res_profile_h, btn_train])
+    btn_train.click(controller.handle_train, inputs=[k_kmeans_slider, k_hier_slider, link_type, pca_dim_radio], outputs=[plot_cluster_km, plot_cluster_h, plot_dendro, res_metrics, res_profile_km, res_profile_h, btn_train]).then(fn=None, inputs=None, outputs=None, js=f"() => {{ {js_scroll.replace('(id) =>', '').strip('{} ')}('train_results'); }}")
     
-    btn_chatgpt.click(controller.handle_chatgpt, inputs=[res_metrics, res_profile_km, res_profile_h], outputs=[chatgpt_prompt, chatgpt_link, btn_chatgpt])
+    btn_chatgpt.click(controller.handle_chatgpt, inputs=[res_metrics, res_profile_km, res_profile_h], outputs=[chatgpt_prompt, chatgpt_link, btn_chatgpt]).then(fn=None, inputs=None, outputs=None, js=f"() => {{ {js_scroll.replace('(id) =>', '').strip('{} ')}('prompt_results'); }}")
     
     btn_exp.click(controller.handle_export_all, outputs=[file_out, btn_exp])
 

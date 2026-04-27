@@ -16,6 +16,10 @@ try:
 except ImportError:
     PLOTLY_AVAILABLE = False
 
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 class ModelManager:
     """
     Lớp quản lý các mô hình Học máy phân cụm.
@@ -53,18 +57,19 @@ class ModelManager:
             ax.text(0.5, 0.5, "Dữ liệu quá ít", ha='center')
             return fig, fig, pd.DataFrame([{"Lỗi": "Dữ liệu quá ít."}]), 2, 2
 
-        # --- Tối ưu RAM: Lấy mẫu nếu dữ liệu quá lớn (N > 10,000) ---
-        # Việc tìm K tối ưu không nhất thiết cần toàn bộ dữ liệu nếu dữ liệu đủ lớn.
-        MAX_SAMPLES = 10000 
-        if len(X_full) > MAX_SAMPLES:
+        # --- Tối ưu RAM: Lấy mẫu nếu dữ liệu quá lớn ---
+        max_samples = int(os.getenv("MAX_ANALYSIS_SAMPLES", 10000))
+        if len(X_full) > max_samples:
             np.random.seed(42)
-            idx = np.random.choice(len(X_full), MAX_SAMPLES, replace=False)
+            idx = np.random.choice(len(X_full), max_samples, replace=False)
             X = X_full[idx]
         else:
             X = X_full
 
-        limit = min(11, len(X))
-        K_range = list(range(2, limit))
+        k_max = int(os.getenv("K_RANGE_MAX", 11))
+        limit = min(k_max, len(X))
+        k_min = int(os.getenv("K_RANGE_MIN", 2))
+        K_range = list(range(k_min, limit))
         
         # Biến lưu trữ cho K-Means
         sum_wcss_km = np.zeros(len(range(1, limit)))
@@ -122,15 +127,22 @@ class ModelManager:
         elbow_idx = self._detect_elbow_kneedle(avg_wcss_km)
         best_elbow_km = K_range[min(elbow_idx, len(K_range) - 1)]
         
-        km_votes = Counter([best_sil_km, best_sil_km, best_ch_km, best_ch_km, best_elbow_km])
-        k_kmeans = km_votes.most_common(1)[0][0]
-
         # Tìm K tốt nhất cho Hierarchical (Sử dụng BIRCH để tối ưu RAM và tốc độ)
         best_sil_h = K_range[np.argmax(avg_sil_h)]
         best_db_h = K_range[np.argmin(avg_db_h)]
         best_ch_h = K_range[np.argmax(avg_ch_h)]
-        
-        h_votes = Counter([best_db_h, best_db_h, best_sil_h, best_ch_h])
+
+        # Biểu quyết K tốt nhất
+        w_sil = int(os.getenv("WEIGHT_SIL_KM", 2))
+        w_ch = int(os.getenv("WEIGHT_CH_KM", 2))
+        w_elbow = int(os.getenv("WEIGHT_ELBOW_KM", 1))
+        km_votes = Counter([best_sil_km]*w_sil + [best_ch_km]*w_ch + [best_elbow_km]*w_elbow)
+        k_kmeans = km_votes.most_common(1)[0][0]
+
+        w_db_h = int(os.getenv("WEIGHT_DB_H", 2))
+        w_sil_h = int(os.getenv("WEIGHT_SIL_H", 1))
+        w_ch_h = int(os.getenv("WEIGHT_CH_H", 1))
+        h_votes = Counter([best_db_h]*w_db_h + [best_sil_h]*w_sil_h + [best_ch_h]*w_ch_h)
         k_hierarchical = h_votes.most_common(1)[0][0]
 
         # Bảng chi tiết
@@ -166,7 +178,7 @@ class ModelManager:
         gc.collect()
         return fig_km, fig_h, detail_df, k_kmeans, k_hierarchical
 
-    def run_clustering(self, processed_df, profile_base_df, k_kmeans, k_hierarchical, linkage_type):
+    def run_clustering(self, processed_df, profile_base_df, k_kmeans, k_hierarchical, linkage_type, pca_dim="3D"):
         """
         Thực thi K-Means (dùng k_kmeans) và Hierarchical (dùng k_hierarchical) riêng biệt.
         Sau đó thực hiện giảm chiều PCA và dựng biểu đồ 3D Interactive.
@@ -177,6 +189,7 @@ class ModelManager:
             k_kmeans (int): Số cụm cho K-Means.
             k_hierarchical (int): Số cụm cho Hierarchical.
             linkage_type (str): Phương pháp linkage.
+            pca_dim (str): '2D' hoặc '3D'.
 
         Returns:
             tuple: (fig_km, fig_h, fig_dendro, metrics, profile_data, final_labeled_df)
@@ -184,15 +197,13 @@ class ModelManager:
         X = processed_df.values.astype(np.float32)
 
         # ── K-Means ──────────────────────────────────────────────────────────
-        use_mini_batch = len(X) > 25000
+        threshold_mini = int(os.getenv("MINI_BATCH_THRESHOLD", 25000))
+        use_mini_batch = len(X) > threshold_mini
         gc.collect()
-        try:
-            from sklearn.cluster import MiniBatchKMeans
-        except ImportError:
-            use_mini_batch = False
-
+        
         if use_mini_batch:
-            kmeans = MiniBatchKMeans(n_clusters=k_kmeans, random_state=42, n_init=5, batch_size=2048)
+            b_size = int(os.getenv("BATCH_SIZE", 2048))
+            kmeans = MiniBatchKMeans(n_clusters=k_kmeans, random_state=42, n_init=5, batch_size=b_size)
         else:
             kmeans = KMeans(n_clusters=k_kmeans, random_state=42, n_init=10)
         km_labels = kmeans.fit_predict(X)
@@ -211,8 +222,9 @@ class ModelManager:
         else:
             self.X_for_dendro = X
 
-        # ── PCA giảm chiều (dùng max của 2 K để đủ trục) ─────────────────────
-        n_components = min(3, X.shape[1])
+        # ── PCA giảm chiều ───────────────────────────────────────────────────
+        target_dim = 3 if pca_dim == "3D" else 2
+        n_components = min(target_dim, X.shape[1])
         pca = PCA(n_components=n_components)
         X_pca = pca.fit_transform(X)
         gc.collect()
@@ -228,11 +240,11 @@ class ModelManager:
                 h_centroids.append(np.zeros(n_components))
         h_centroids = np.array(h_centroids)
 
-        # ── Giới hạn số điểm vẽ để tránh treo trình duyệt (Max 10,000 điểm) ───
-        MAX_PLOT_POINTS = 10000
-        if len(X_pca) > MAX_PLOT_POINTS:
+        # ── Giới hạn số điểm vẽ để tránh treo trình duyệt ─────────────────────
+        max_visual = int(os.getenv("MAX_VISUAL_SAMPLES", 10000))
+        if len(X_pca) > max_visual:
             np.random.seed(42)
-            plot_idx = np.random.choice(len(X_pca), MAX_PLOT_POINTS, replace=False)
+            plot_idx = np.random.choice(len(X_pca), max_visual, replace=False)
             X_plot = X_pca[plot_idx]
             km_labels_plot = km_labels[plot_idx]
             h_labels_plot = h_labels[plot_idx]
@@ -241,45 +253,55 @@ class ModelManager:
             km_labels_plot = km_labels
             h_labels_plot = h_labels
 
-        # ── Biểu đồ 3D ───────────────────────────────────────────────────────
-        if n_components == 3 and PLOTLY_AVAILABLE:
-            fig_km = go.Figure()
-            fig_km.add_trace(go.Scatter3d(
-                x=X_plot[:, 0], y=X_plot[:, 1], z=X_plot[:, 2], mode='markers',
-                marker=dict(color=km_labels_plot, colorscale='Turbo', size=6, opacity=1.0,
-                            line=dict(color='black', width=1)), name='Dữ liệu (Mẫu)'))
-            fig_km.add_trace(go.Scatter3d(
-                x=km_centroids[:, 0], y=km_centroids[:, 1], z=km_centroids[:, 2], mode='markers',
-                marker=dict(color='darkred', symbol='x', size=4, line=dict(width=3, color='darkred')),
-                name='Tâm cụm'))
-            fig_km.update_layout(
-                title_text=f'K-Means (K={k_kmeans}) - 3D Interactive (Hiển thị mẫu {len(X_plot)} điểm)',
-                height=600, showlegend=True, margin=dict(l=0, r=0, b=0, t=40), template='plotly_white')
+        # ── Biểu đồ Trực quan hoá (Plotly ưu tiên) ────────────────────────────
+        if PLOTLY_AVAILABLE:
+            def create_plotly_fig(X_p, labels_p, centroids_p, title, k):
+                fig = go.Figure()
+                if n_components == 3:
+                    fig.add_trace(go.Scatter3d(
+                        x=X_p[:, 0], y=X_p[:, 1], z=X_p[:, 2], mode='markers',
+                        marker=dict(color=labels_p, colorscale='Turbo', size=5, opacity=0.8,
+                                    line=dict(color='black', width=0.5)), name='Dữ liệu (Mẫu)'))
+                    fig.add_trace(go.Scatter3d(
+                        x=centroids_p[:, 0], y=centroids_p[:, 1], z=centroids_p[:, 2], mode='markers',
+                        marker=dict(color='red', symbol='diamond', size=8, line=dict(width=2, color='white')),
+                        name='Tâm cụm'))
+                else:
+                    # 2D hoặc 1D (nếu 1D thì y=0)
+                    y_vals = X_p[:, 1] if n_components >= 2 else np.zeros(len(X_p))
+                    cy_vals = centroids_p[:, 1] if n_components >= 2 else np.zeros(len(centroids_p))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=X_p[:, 0], y=y_vals, mode='markers',
+                        marker=dict(color=labels_p, colorscale='Turbo', size=8, opacity=0.7,
+                                    line=dict(color='black', width=1)), name='Dữ liệu (Mẫu)'))
+                    fig.add_trace(go.Scatter(
+                        x=centroids_p[:, 0], y=cy_vals, mode='markers',
+                        marker=dict(color='red', symbol='x', size=12, line=dict(width=2)),
+                        name='Tâm cụm'))
+                
+                fig.update_layout(
+                    title_text=f'{title} (K={k}) - {n_components}D PCA (Mẫu {len(X_p)} điểm)',
+                    height=600, showlegend=True, margin=dict(l=0, r=0, b=0, t=40), template='plotly_white')
+                return fig
 
-            fig_h = go.Figure()
-            fig_h.add_trace(go.Scatter3d(
-                x=X_plot[:, 0], y=X_plot[:, 1], z=X_plot[:, 2], mode='markers',
-                marker=dict(color=h_labels_plot, colorscale='Turbo', size=6, opacity=1.0,
-                            line=dict(color='black', width=1)), name='Dữ liệu (Mẫu)'))
-            fig_h.add_trace(go.Scatter3d(
-                x=h_centroids[:, 0], y=h_centroids[:, 1], z=h_centroids[:, 2], mode='markers',
-                marker=dict(color='darkred', symbol='x', size=4, line=dict(width=3, color='darkred')),
-                name='Tâm cụm'))
-            fig_h.update_layout(
-                title_text=f'Hierarchical (K={k_hierarchical}, {linkage_type}) - 3D (Hiển thị mẫu {len(X_plot)} điểm)',
-                height=600, showlegend=True, margin=dict(l=0, r=0, b=0, t=40), template='plotly_white')
+            fig_km = create_plotly_fig(X_plot, km_labels_plot, km_centroids, "K-Means", k_kmeans)
+            fig_h = create_plotly_fig(X_plot, h_labels_plot, h_centroids, "Hierarchical", k_hierarchical)
 
         else:
+            # Fallback sang Matplotlib nếu không có Plotly
             fig_km, ax1 = plt.subplots(figsize=(8, 6), dpi=300)
-            ax1.scatter(X_plot[:, 0], X_plot[:, 1], c=km_labels_plot, cmap='viridis', edgecolor='k', alpha=0.7, s=50)
-            ax1.scatter(km_centroids[:, 0], km_centroids[:, 1], c='darkred', marker='x', s=20, linewidths=2, label='Tâm cụm')
-            ax1.set_title(f'K-Means (K={k_kmeans}) - PCA (Mẫu {len(X_plot)} điểm)')
+            x_vals = X_plot[:, 0]
+            y_vals = X_plot[:, 1] if n_components >= 2 else np.zeros(len(X_plot))
+            ax1.scatter(x_vals, y_vals, c=km_labels_plot, cmap='viridis', edgecolor='k', alpha=0.7, s=50)
+            ax1.scatter(km_centroids[:, 0], km_centroids[:, 1] if n_components >= 2 else 0, c='darkred', marker='x', s=20, linewidths=2, label='Tâm cụm')
+            ax1.set_title(f'K-Means (K={k_kmeans}) - {n_components}D PCA')
             ax1.legend()
 
             fig_h, ax2 = plt.subplots(figsize=(8, 6), dpi=300)
-            ax2.scatter(X_plot[:, 0], X_plot[:, 1], c=h_labels_plot, cmap='plasma', edgecolor='k', alpha=0.7, s=50)
-            ax2.scatter(h_centroids[:, 0], h_centroids[:, 1], c='darkred', marker='x', s=20, linewidths=2, label='Tâm cụm')
-            ax2.set_title(f'Hierarchical (K={k_hierarchical}, {linkage_type}) - PCA (Mẫu {len(X_plot)} điểm)')
+            ax2.scatter(x_vals, y_vals, c=h_labels_plot, cmap='plasma', edgecolor='k', alpha=0.7, s=50)
+            ax2.scatter(h_centroids[:, 0], h_centroids[:, 1] if n_components >= 2 else 0, c='darkred', marker='x', s=20, linewidths=2, label='Tâm cụm')
+            ax2.set_title(f'Hierarchical (K={k_hierarchical}, {linkage_type}) - {n_components}D PCA')
             ax2.legend()
 
         # ── Dendrogram ───────────────────────────────────────────────────────
@@ -318,23 +340,36 @@ class ModelManager:
 
         fig_dendro.tight_layout(pad=2.0)
 
-        # ── Bảng so sánh Metrics ─────────────────────────────────────────────
-        sil_sample = 10000 if len(X) > 10000 else None
+        # ── Bảng so sánh Metrics (Tối ưu cho dữ liệu lớn bằng cách lấy mẫu) ──
+        max_metric_samples = int(os.getenv("MAX_METRIC_SAMPLES", 20000))
+        if len(X) > max_metric_samples:
+            np.random.seed(42)
+            m_idx = np.random.choice(len(X), max_metric_samples, replace=False)
+            X_metrics = X[m_idx]
+            km_labels_metrics = km_labels[m_idx]
+            h_labels_metrics = h_labels[m_idx]
+        else:
+            X_metrics = X
+            km_labels_metrics = km_labels
+            h_labels_metrics = h_labels
+
         metrics = pd.DataFrame({
             "Chỉ số": ["Silhouette Score (↑)", "Davies-Bouldin Index (↓)", "Calinski-Harabasz Index (↑)"],
             f"K-Means (K={k_kmeans})": [
-                f"{silhouette_score(X, km_labels, sample_size=sil_sample, random_state=42):.4f}",
-                f"{davies_bouldin_score(X, km_labels):.4f}",
-                f"{calinski_harabasz_score(X, km_labels):.4f}"
+                f"{silhouette_score(X_metrics, km_labels_metrics, random_state=42):.4f}",
+                f"{davies_bouldin_score(X_metrics, km_labels_metrics):.4f}",
+                f"{calinski_harabasz_score(X_metrics, km_labels_metrics):.4f}"
             ],
             f"Hierarchical (K={k_hierarchical})": [
-                f"{silhouette_score(X, h_labels, sample_size=sil_sample, random_state=42):.4f}",
-                f"{davies_bouldin_score(X, h_labels):.4f}",
-                f"{calinski_harabasz_score(X, h_labels):.4f}"
+                f"{silhouette_score(X_metrics, h_labels_metrics, random_state=42):.4f}",
+                f"{davies_bouldin_score(X_metrics, h_labels_metrics):.4f}",
+                f"{calinski_harabasz_score(X_metrics, h_labels_metrics):.4f}"
             ]
         })
+        del X_metrics, km_labels_metrics, h_labels_metrics
+        gc.collect()
 
-        # ── Profiling (dựa trên nhãn của cả 2 mô hình) ───────────────────────
+        # ── Profiling ───────────────────────────────────────────────────────
         self.final_labeled_df = profile_base_df.copy()
         self.final_labeled_df['Cluster_KMeans'] = km_labels
         self.final_labeled_df['Cluster_Hierarchical'] = h_labels
