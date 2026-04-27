@@ -334,7 +334,8 @@
                     class="glass p-8 rounded-3xl flex flex-col items-center justify-center text-center space-y-6 border border-emerald-500/20">
                     <div
                         class="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center shadow-inner shadow-emerald-500/20">
-                        <i class="fas fa-file-zipper text-emerald-500 text-4xl"></i></div>
+                        <i class="fas fa-file-zipper text-emerald-500 text-4xl"></i>
+                    </div>
                     <div>
                         <h3 class="text-2xl font-bold mb-2">Xuất Full Báo Cáo (.ZIP)</h3>
                         <p class="text-slate-400 text-sm max-w-sm">Tải về toàn bộ biểu đồ (PNG độ phân giải cao) và dữ
@@ -407,17 +408,17 @@
         const fileInput = document.getElementById('csv_file');
         fileInput.onchange = async () => {
             if (!fileInput.files[0]) return;
-            
+
             const file = fileInput.files[0];
-            const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+            const chunkSize = 1 * 1024 * 1024; // 1MB chunks
             const totalChunks = Math.ceil(file.size / chunkSize);
             const fileId = "upload_" + Math.random().toString(36).substr(2, 9);
-            
-            Swal.fire({ 
-                title: 'Đang chuẩn bị nạp...', 
-                text: 'Hệ thống đang nạp dữ liệu. Vui lòng chờ...', 
-                allowOutsideClick: false, 
-                didOpen: () => Swal.showLoading() 
+
+            Swal.fire({
+                title: 'Đang chuẩn bị nạp...',
+                text: 'Hệ thống đang nạp dữ liệu. Vui lòng chờ...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
             });
 
             try {
@@ -426,7 +427,7 @@
                     const start = i * chunkSize;
                     const end = Math.min(start + chunkSize, file.size);
                     const chunk = file.slice(start, end);
-                    
+
                     const formData = new FormData();
                     formData.append('file', chunk);
                     formData.append('chunkIndex', i);
@@ -439,10 +440,15 @@
                     });
 
                     const res = await fetch('/api/upload_chunk', { method: 'POST', body: formData });
+                    
+                    if (!res.ok) {
+                        throw new Error(`HTTP Lỗi ${res.status}: Máy chủ từ chối hoặc quá tải.`);
+                    }
+                    
                     const data = await res.json();
 
                     if (data.error) {
-                        Swal.fire('Lỗi', data.error, 'error');
+                        Swal.fire('Lỗi từ Server', data.error, 'error');
                         return;
                     }
                     if (data.status === 'completed') {
@@ -450,7 +456,7 @@
                     }
                 }
 
-                if (!finalData) throw new Error("Upload failed to complete");
+                if (!finalData) throw new Error("Quá trình tải lên không hoàn tất.");
 
                 // Render Preview Table
                 if (finalData.preview_html) {
@@ -458,34 +464,36 @@
                 } else {
                     renderTable('preview-table', finalData.preview);
                 }
-                
+
                 const data = finalData;
 
-            // Render Checkboxes
-            const cbContainer = document.getElementById('cols-checkboxes');
-            cbContainer.innerHTML = data.columns.map(c => `
+                // Render Checkboxes
+                const cbContainer = document.getElementById('cols-checkboxes');
+                cbContainer.innerHTML = data.columns.map(c => `
                 <label class="flex items-center gap-2 bg-slate-800/50 px-4 py-2 rounded-full cursor-pointer hover:bg-slate-800 transition-all">
                     <input type="checkbox" value="${c}" class="col-cb accent-blue-500">
                     <span class="text-xs">${c}</span>
                 </label>
             `).join('');
 
-            // Load Heatmap
-            const hmRes = await fetch('/api/heatmap');
-            const hmData = await hmRes.json();
-            document.getElementById('heatmap-container').innerHTML = `<img src="data:image/png;base64,${hmData.image}" class="max-h-[500px] rounded-xl shadow-lg">`;
+                // Load Heatmap
+                const hmRes = await fetch('/api/heatmap');
+                if (!hmRes.ok) throw new Error(`Lỗi tải Heatmap HTTP ${hmRes.status}`);
+                const hmData = await hmRes.json();
+                document.getElementById('heatmap-container').innerHTML = `<img src="data:image/png;base64,${hmData.image}" class="max-h-[500px] rounded-xl shadow-lg">`;
 
-            Swal.fire({
-                title: 'Thành công!',
-                text: 'Dữ liệu đã được nạp. Vui lòng sang bước 2.',
-                icon: 'success',
-                timer: 1500,
-                showConfirmButton: false
-            });
-            setTimeout(() => showTab('preprocess'), 1500);
-            
+                Swal.fire({
+                    title: 'Thành công!',
+                    text: 'Dữ liệu đã được nạp. Vui lòng sang bước 2.',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                setTimeout(() => showTab('preprocess'), 1500);
+
             } catch (error) {
-                Swal.fire('Lỗi', 'Đã xảy ra lỗi kết nối với máy chủ. Vui lòng thử lại.', 'error');
+                console.error("Upload Error:", error);
+                Swal.fire('Lỗi tải lên', error.message || 'Lỗi không xác định', 'error');
             }
         };
 
@@ -529,7 +537,7 @@
             const res = await fetch('/api/analyze-k', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     n_trials: document.getElementById('n_trials_val').value,
                     session_id: sessionId
                 })
