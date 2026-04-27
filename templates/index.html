@@ -1,70 +1,162 @@
 <!DOCTYPE html>
 <html lang="vi" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Clustering Pro | Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0b0f1a; color: #e2e8f0; }
-        .glass { background: rgba(23, 28, 41, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .active-tab { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0b0f1a;
+            color: #e2e8f0;
+        }
+
+        .glass {
+            background: rgba(23, 28, 41, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-pane {
+            transition: all 0.3s ease;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border_radius: 10px;
+        }
+
+        .btn {
+            @apply px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2;
+        }
+
+        input[type="checkbox"] {
+            width: 1.2rem;
+            height: 1.2rem;
+        }
     </style>
 </head>
-<body class="custom-scrollbar">
 
+<body class="min-h-screen">
     <!-- Sidebar -->
-    <aside class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full sm:translate-x-0 glass border-r border-slate-800">
-        <div class="h-full px-6 py-8 overflow-y-auto">
-            <div class="flex items-center mb-10 gap-3">
-                <div class="p-2 bg-blue-600 rounded-lg"><i class="fas fa-microchip text-white text-xl"></i></div>
-                <span class="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">AI Clustering</span>
+    <aside class="fixed left-0 top-0 h-full w-72 glass border-r border-slate-800 z-50 hidden lg:block">
+        <div class="p-8">
+            <div class="flex items-center gap-3 mb-10">
+                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <i class="fas fa-brain text-white text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                        Clustering Pro</h2>
+                    <div class="text-[10px] text-slate-500 font-mono mt-1" id="session-display">SID: Loading...</div>
+                </div>
             </div>
-            <ul class="space-y-3">
-                <li><button onclick="showTab('data')" id="btn-data" class="nav-btn w-full flex items-center p-3 text-slate-400 rounded-xl hover:bg-slate-800 hover:text-white transition-all active-tab"><i class="fas fa-database w-6"></i><span>Dữ liệu</span></button></li>
-                <li><button onclick="showTab('preprocess')" id="btn-preprocess" class="nav-btn w-full flex items-center p-3 text-slate-400 rounded-xl hover:bg-slate-800 hover:text-white transition-all"><i class="fas fa-wand-magic-sparkles w-6"></i><span>Tiền xử lý</span></button></li>
-                <li><button onclick="showTab('analyze')" id="btn-analyze" class="nav-btn w-full flex items-center p-3 text-slate-400 rounded-xl hover:bg-slate-800 hover:text-white transition-all"><i class="fas fa-magnifying-glass-chart w-6"></i><span>Phân tích K</span></button></li>
-                <li><button onclick="showTab('train')" id="btn-train" class="nav-btn w-full flex items-center p-3 text-slate-400 rounded-xl hover:bg-slate-800 hover:text-white transition-all"><i class="fas fa-gears w-6"></i><span>Huấn luyện</span></button></li>
-                <li><button onclick="showTab('export')" id="btn-export" class="nav-btn w-full flex items-center p-3 text-slate-400 rounded-xl hover:bg-slate-800 hover:text-white transition-all"><i class="fas fa-file-export w-6"></i><span>Xuất báo cáo</span></button></li>
-            </ul>
+
+            <nav class="space-y-2">
+                <button onclick="showTab('data')"
+                    class="nav-link w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group active"
+                    id="btn-data">
+                    <i class="fas fa-file-import text-lg group-[.active]:text-blue-500"></i>
+                    <span class="font-medium text-sm">1. Nạp dữ liệu</span>
+                </button>
+                <button onclick="showTab('preprocess')"
+                    class="nav-link w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group"
+                    id="btn-preprocess">
+                    <i class="fas fa-magic text-lg group-[.active]:text-blue-500"></i>
+                    <span class="font-medium text-sm">2. Tiền xử lý</span>
+                </button>
+                <button onclick="showTab('analyze')"
+                    class="nav-link w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group"
+                    id="btn-analyze">
+                    <i class="fas fa-chart-line text-lg group-[.active]:text-blue-500"></i>
+                    <span class="font-medium text-sm">3. Phân tích K</span>
+                </button>
+                <button onclick="showTab('train')"
+                    class="nav-link w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group"
+                    id="btn-train">
+                    <i class="fas fa-microchip text-lg group-[.active]:text-blue-500"></i>
+                    <span class="font-medium text-sm">4. Huấn luyện</span>
+                </button>
+                <button onclick="showTab('export')"
+                    class="nav-link w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group"
+                    id="btn-export">
+                    <i class="fas fa-file-export text-lg group-[.active]:text-blue-500"></i>
+                    <span class="font-medium text-sm">5. Xuất báo cáo</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="absolute bottom-8 left-8 right-8 p-6 glass rounded-3xl border border-slate-700/50">
+            <div class="flex items-center gap-3 mb-4">
+                <div id="sys-status" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                <span class="text-xs font-bold text-slate-300">SYSTEM STATUS</span>
+            </div>
+            <div class="space-y-3">
+                <div class="flex justify-between text-[10px]">
+                    <span class="text-slate-500">CPU Usage</span>
+                    <span id="cpu-text" class="text-blue-400 font-bold">0%</span>
+                </div>
+                <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="cpu-bar" class="h-full bg-blue-500 transition-all duration-1000" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-[10px]">
+                    <span class="text-slate-500">RAM Usage</span>
+                    <span id="ram-text" class="text-emerald-400 font-bold">0%</span>
+                </div>
+                <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="ram-bar" class="h-full bg-emerald-500 transition-all duration-1000" style="width: 0%">
+                    </div>
+                </div>
+            </div>
         </div>
     </aside>
 
     <!-- Main Content -->
-    <main class="p-8 sm:ml-64">
-        
-        <!-- Tab 1: Data Load & Correlation -->
+    <main class="lg:ml-72 p-8 pt-20 lg:pt-8 min-h-screen">
+        <!-- Tab 1: Data -->
         <section id="tab-data" class="tab-pane">
-            <div class="flex justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold text-white">Nạp & Khám phá Dữ liệu</h1>
-                <div id="sys-info" class="text-xs text-slate-500 font-mono">🖥️ CPU: --% | 🧠 RAM: --%</div>
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h1 class="text-3xl font-bold text-white mb-2">Nạp dữ liệu nghiên cứu</h1>
+                    <p class="text-slate-400">Khởi đầu quy trình phân cụm bằng cách tải lên tập dữ liệu CSV của bạn.</p>
+                </div>
+                <label
+                    class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-2xl cursor-pointer transition-all flex items-center gap-3 shadow-lg shadow-blue-600/20">
+                    <i class="fas fa-cloud-upload-alt text-xl"></i>
+                    <span>Tải file CSV</span>
+                    <input type="file" id="csv_file" class="hidden" accept=".csv">
+                </label>
             </div>
-            
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-1 space-y-6">
-                    <div class="glass p-6 rounded-3xl">
-                        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-cloud-arrow-up text-blue-500"></i> Upload CSV</h3>
-                        <div id="dropzone" class="border-2 border-dashed border-slate-700 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-500/5 transition-all">
-                            <i class="fas fa-file-csv text-4xl text-slate-600 mb-3"></i>
-                            <p class="text-sm text-slate-400">Kéo thả hoặc click để chọn file</p>
-                            <input type="file" id="fileInput" class="hidden" accept=".csv">
+
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                <div class="xl:col-span-2 glass p-8 rounded-3xl">
+                    <h3 class="text-xl font-bold mb-6 flex items-center gap-2"><i
+                            class="fas fa-table text-blue-500"></i> Xem trước dữ liệu</h3>
+                    <div id="preview-table" class="custom-scrollbar overflow-x-auto min-h-[400px]">
+                        <div class="flex flex-col items-center justify-center h-full text-slate-600 space-y-4 py-20">
+                            <i class="fas fa-file-csv text-6xl opacity-20"></i>
+                            <p>Chưa có dữ liệu. Vui lòng tải file để bắt đầu.</p>
                         </div>
                     </div>
                 </div>
-                <div class="lg:col-span-2 glass p-6 rounded-3xl">
-                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-table text-emerald-500"></i> Xem trước 5 dòng</h3>
-                    <div id="preview-table" class="overflow-x-auto text-sm text-slate-400">Chưa có dữ liệu</div>
-                </div>
-                <div class="lg:col-span-3 glass p-6 rounded-3xl">
-                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-fire text-orange-500"></i> Ma trận tương quan (Heatmap)</h3>
-                    <div id="heatmap-container" class="flex justify-center bg-slate-900/50 rounded-2xl p-4 min-h-[300px]">
-                        <p class="self-center text-slate-600">Nạp dữ liệu để xem Heatmap</p>
+                <div class="xl:col-span-1 glass p-8 rounded-3xl">
+                    <h3 class="text-xl font-bold mb-6 flex items-center gap-2"><i
+                            class="fas fa-chart-pie text-emerald-500"></i> Heatmap tương quan</h3>
+                    <div id="heatmap-container" class="flex items-center justify-center min-h-[400px]">
+                        <div class="text-slate-600 text-center opacity-50"><i
+                                class="fas fa-braille text-6xl mb-4 block"></i>Phân tích tương quan...</div>
                     </div>
                 </div>
             </div>
@@ -72,30 +164,37 @@
 
         <!-- Tab 2: Preprocess -->
         <section id="tab-preprocess" class="tab-pane hidden">
-            <h1 class="text-3xl font-bold text-white mb-8">Tiền xử lý Dữ liệu</h1>
-            <div class="glass p-8 rounded-3xl space-y-8">
-                <div id="col-selector" class="space-y-4">
-                    <p class="text-slate-400 font-medium">Chọn các cột cần loại bỏ:</p>
+            <h1 class="text-3xl font-bold text-white mb-8">Cấu hình Tiền xử lý</h1>
+            <div class="glass p-8 rounded-3xl space-y-10">
+                <div class="space-y-4">
+                    <h3 class="font-bold flex items-center gap-2"><i class="fas fa-filter text-orange-500"></i> Loại bỏ
+                        đặc trưng (Feature Drop)</h3>
+                    <p class="text-sm text-slate-400">Chọn các cột không mang tính chất phân loại (như ID, Tên, Mã
+                        số...) để loại bỏ khỏi mô hình.</p>
                     <div id="cols-checkboxes" class="flex flex-wrap gap-3"></div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-slate-800 pt-8">
                     <div class="space-y-3">
-                        <label class="text-sm text-slate-500">Xử lý Missing</label>
-                        <select id="imp_method" class="w-full bg-slate-800 border-none rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500">
+                        <label class="text-sm text-slate-500">Xử lý Missing Value</label>
+                        <select id="imp_method"
+                            class="w-full bg-slate-900 border-none rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500">
                             <option value="Mean">Mean (Trung bình)</option>
                             <option value="Median">Median (Trung vị)</option>
                             <option value="Drop">Drop (Xóa hàng)</option>
                         </select>
                     </div>
                     <div class="space-y-3">
-                        <label class="text-sm text-slate-500">Chuẩn hóa</label>
-                        <select id="scl_method" class="w-full bg-slate-800 border-none rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500">
+                        <label class="text-sm text-slate-500">Phương pháp Chuẩn hóa</label>
+                        <select id="scl_method"
+                            class="w-full bg-slate-900 border-none rounded-xl p-3 text-white focus:ring-2 focus:ring-blue-500">
                             <option value="StandardScaler">StandardScaler (Z-Score)</option>
                             <option value="MinMaxScaler">MinMaxScaler (0-1)</option>
                         </select>
                     </div>
                 </div>
-                <button onclick="runPreprocess()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-2xl transition-all flex items-center gap-2">
+                <button onclick="runPreprocess()"
+                    class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-2xl transition-all flex items-center gap-2">
                     <i class="fas fa-play"></i> Chạy Tiền xử lý
                 </button>
                 <div id="preprocess-results" class="mt-8"></div>
@@ -109,9 +208,11 @@
                 <div class="flex flex-wrap items-center gap-6">
                     <div class="flex items-center gap-3 bg-slate-800/50 p-2 rounded-2xl border border-slate-700">
                         <label class="text-xs text-slate-500 ml-2">Số lần chạy (Trials):</label>
-                        <input type="number" id="n_trials_val" value="1" min="1" max="20" class="w-16 bg-slate-900 border-none rounded-xl p-2 text-white text-center focus:ring-2 focus:ring-indigo-500">
+                        <input type="number" id="n_trials_val" value="10" min="1" max="20"
+                            class="w-16 bg-slate-900 border-none rounded-xl p-2 text-white text-center focus:ring-2 focus:ring-indigo-500">
                     </div>
-                    <button onclick="runAnalyzeK()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 px-8 rounded-2xl transition-all flex items-center gap-2">
+                    <button onclick="runAnalyzeK()"
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 px-8 rounded-2xl transition-all flex items-center gap-2">
                         <i class="fas fa-search"></i> Bắt đầu Phân tích (Elbow/Sil/DB/CH)
                     </button>
                     <div id="k-suggestion" class="text-indigo-400 font-medium"></div>
@@ -149,90 +250,127 @@
             <h1 class="text-3xl font-bold text-white mb-8">Huấn luyện & Trực quan</h1>
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 <div class="lg:col-span-1 glass p-6 rounded-3xl space-y-6 h-fit">
-                    <h3 class="font-bold text-blue-500">Cấu hình mô hình</h3>
-                    <div class="space-y-4">
+                    <h3 class="font-bold text-blue-500 underline underline-offset-8">Cấu hình mô hình</h3>
+                    <div class="space-y-4 pt-4">
                         <div>
-                            <label class="text-xs text-slate-500">K cho K-Means</label>
-                            <input type="number" id="k_kmeans_val" value="3" class="w-full bg-slate-800 border-none rounded-lg p-2 text-white">
+                            <label class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">K-Means (Số
+                                cụm)</label>
+                            <input type="number" id="k_kmeans_val" value="3"
+                                class="w-full bg-slate-900 border-none rounded-xl p-3 mt-1 text-white focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="text-xs text-slate-500">K cho Hierarchical</label>
-                            <input type="number" id="k_hier_val" value="3" class="w-full bg-slate-800 border-none rounded-lg p-2 text-white">
+                            <label class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Hierarchical
+                                (Số cụm)</label>
+                            <input type="number" id="k_hier_val" value="3"
+                                class="w-full bg-slate-900 border-none rounded-xl p-3 mt-1 text-white focus:ring-2 focus:ring-emerald-500">
                         </div>
                         <div>
-                            <label class="text-xs text-slate-500">PCA Dimension</label>
-                            <select id="pca_dim_val" class="w-full bg-slate-800 border-none rounded-lg p-2 text-white">
-                                <option value="3D">3D (Interactive)</option>
-                                <option value="2D">2D (Static)</option>
+                            <label class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">PCA
+                                Visualization</label>
+                            <select id="pca_dim_val"
+                                class="w-full bg-slate-900 border-none rounded-xl p-3 mt-1 text-white focus:ring-2 focus:ring-blue-500">
+                                <option value="2D" selected>2D (Ảnh tĩnh - Chuẩn báo cáo)</option>
+                                <option value="3D">3D (Nổi khối xoay được)</option>
                             </select>
                         </div>
-                        <button onclick="startTrain()" class="w-full bg-blue-600 py-3 rounded-xl font-bold hover:bg-blue-500 transition-all">🚀 Start Training</button>
+                        <button onclick="startTrain()"
+                            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
+                            <i class="fas fa-bolt"></i> Bắt đầu Huấn luyện
+                        </button>
                     </div>
                 </div>
                 <div class="lg:col-span-3 space-y-8">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="glass p-4 rounded-2xl">
-                            <h4 class="text-xs text-slate-500 mb-2">PCA: K-Means (Interactive)</h4>
+                            <h4 class="text-xs text-slate-500 mb-2">PCA: K-Means (Kết quả trực quan)</h4>
                             <div id="res-plot-km" class="w-full h-[400px]"></div>
                         </div>
                         <div class="glass p-4 rounded-2xl">
-                            <h4 class="text-xs text-slate-500 mb-2">PCA: Hierarchical (Interactive)</h4>
+                            <h4 class="text-xs text-slate-500 mb-2">PCA: Hierarchical (Kết quả trực quan)</h4>
                             <div id="res-plot-h" class="w-full h-[400px]"></div>
                         </div>
                     </div>
                     <div class="glass p-6 rounded-3xl">
-                        <h3 class="font-bold mb-4">Dendrogram (Phân cụm phân cấp)</h3>
+                        <h3 class="font-bold mb-4 flex items-center gap-2"><i
+                                class="fas fa-sitemap text-indigo-500"></i> Dendrogram (Phân cụm phân cấp)</h3>
                         <div id="res-plot-dendro" class="w-full h-[400px]"></div>
                     </div>
                     <div class="glass p-6 rounded-3xl overflow-hidden">
-                        <h3 class="font-bold mb-4 text-blue-400">So sánh hiệu năng</h3>
-                        <div id="metrics-table" class="text-sm"></div>
+                        <h3 class="font-bold mb-4 text-blue-400 border-b border-slate-800 pb-2">Bảng so sánh hiệu năng
+                            (Clustering Metrics)</h3>
+                        <div id="metrics-table" class="overflow-x-auto text-sm"></div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="glass p-6 rounded-3xl overflow-hidden">
-                            <h3 class="font-bold mb-4 text-emerald-400">Đặc trưng K-Means</h3>
-                            <div id="profile-km-table" class="text-xs"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="glass p-6 rounded-3xl overflow-hidden border border-blue-500/10">
+                            <h3 class="font-bold mb-4 text-blue-400">Đặc trưng cụm (K-Means Profiling)</h3>
+                            <div id="profile-km-table" class="text-[10px] overflow-x-auto"></div>
                         </div>
-                        <div class="glass p-6 rounded-3xl overflow-hidden">
-                            <h3 class="font-bold mb-4 text-orange-400">Đặc trưng Hierarchical</h3>
-                            <div id="profile-h-table" class="text-xs"></div>
+                        <div class="glass p-6 rounded-3xl overflow-hidden border border-emerald-500/10">
+                            <h3 class="font-bold mb-4 text-emerald-400">Đặc trưng cụm (Hierarchical Profiling)</h3>
+                            <div id="profile-h-table" class="text-[10px] overflow-x-auto"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Tab 5: AI Prompt & Export -->
+        <!-- Tab 5: Export -->
         <section id="tab-export" class="tab-pane hidden">
-            <h1 class="text-3xl font-bold text-white mb-8">Trợ lý AI & Báo cáo</h1>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="glass p-8 rounded-3xl space-y-6">
-                    <h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-robot text-purple-500"></i> AI Analyst Prompt</h3>
-                    <p class="text-slate-400 text-sm">Hệ thống tự tổng hợp kết quả thành Prompt để anh/chị gửi ChatGPT viết báo cáo.</p>
-                    <textarea id="ai-prompt-area" class="w-full h-48 bg-slate-900 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 custom-scrollbar focus:ring-2 focus:ring-purple-500 outline-none" readonly></textarea>
-                    <button onclick="copyPrompt()" class="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl transition-all flex items-center gap-2"><i class="fas fa-copy"></i> Sao chép Prompt</button>
+            <h1 class="text-3xl font-bold text-white mb-8">Trình quản lý Báo cáo & AI</h1>
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <div class="glass p-8 rounded-3xl space-y-6 border border-indigo-500/20">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center"><i
+                                class="fas fa-robot text-white text-xl"></i></div>
+                        <h3 class="text-xl font-bold">Trợ lý AI (ChatGPT Prompt)</h3>
+                    </div>
+                    <p class="text-slate-400 text-sm">Hệ thống đã tự động phân tích bảng Profile và Metrics để tạo ra
+                        nội dung phân tích chi tiết. Bạn có thể sao chép đoạn này để hỏi ChatGPT/Claude để viết luận
+                        văn.</p>
+                    <textarea id="ai-prompt-area" rows="12"
+                        class="w-full bg-slate-900/80 border border-slate-700 rounded-2xl p-4 text-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none custom-scrollbar"
+                        placeholder="Kết quả huấn luyện sẽ xuất hiện ở đây..."></textarea>
+                    <button onclick="copyPrompt()"
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 px-8 rounded-2xl transition-all flex items-center gap-2">
+                        <i class="fas fa-copy"></i> Sao chép nội dung phân tích
+                    </button>
                 </div>
-                <div class="glass p-8 rounded-3xl flex flex-col justify-center items-center text-center space-y-6">
-                    <div class="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center"><i class="fas fa-file-zipper text-emerald-500 text-3xl"></i></div>
-                    <h3 class="text-xl font-bold">Xuất Full Báo Cáo (.ZIP)</h3>
-                    <p class="text-slate-400 text-sm">Bao gồm toàn bộ dữ liệu CSV và hình ảnh biểu đồ độ phân giải cao cho luận văn.</p>
-                    <button onclick="downloadZip()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-10 rounded-2xl transition-all flex items-center gap-2">
-                        <i class="fas fa-download"></i> Tải về ZIP
+
+                <div
+                    class="glass p-8 rounded-3xl flex flex-col items-center justify-center text-center space-y-6 border border-emerald-500/20">
+                    <div
+                        class="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center shadow-inner shadow-emerald-500/20">
+                        <i class="fas fa-file-zipper text-emerald-500 text-4xl"></i></div>
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2">Xuất Full Báo Cáo (.ZIP)</h3>
+                        <p class="text-slate-400 text-sm max-w-sm">Tải về toàn bộ biểu đồ (PNG độ phân giải cao) và dữ
+                            liệu chi tiết (CSV) để chèn vào báo cáo khoa học của bạn.</p>
+                    </div>
+                    <button onclick="downloadZip()"
+                        class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-5 px-12 rounded-2xl transition-all flex items-center gap-3 shadow-lg shadow-emerald-600/20">
+                        <i class="fas fa-download text-xl"></i> Tải về trọn bộ kết quả
                     </button>
                 </div>
             </div>
         </section>
-
     </main>
 
-    <!-- Global Task Status Toast -->
-    <div id="status-toast" class="fixed bottom-8 right-8 glass border-blue-500/50 p-6 rounded-2xl shadow-2xl hidden w-80 translate-y-10 opacity-0 transition-all duration-500">
-        <div class="flex justify-between items-center mb-3">
-            <span id="toast-title" class="font-bold text-sm text-blue-400">Đang huấn luyện...</span>
-            <span id="toast-timer" class="text-xs font-mono">0s</span>
-        </div>
-        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-            <div id="toast-progress" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
+    <!-- Polling Status Toast -->
+    <div id="status-toast"
+        class="fixed bottom-8 right-8 glass p-6 rounded-3xl border border-blue-500/30 shadow-2xl z-[100] hidden transform translate-y-10 opacity-0 transition-all duration-500 min-w-[300px]">
+        <div class="flex items-center gap-5">
+            <div class="relative">
+                <div class="w-12 h-12 rounded-full border-4 border-slate-800 border-t-blue-500 animate-spin"></div>
+                <div class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-blue-400"
+                    id="toast-timer">0s</div>
+            </div>
+            <div class="flex-1">
+                <h4 class="font-bold text-sm text-white mb-1" id="toast-title">Đang xử lý tác vụ...</h4>
+                <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="toast-progress" class="h-full bg-blue-500 transition-all duration-500" style="width: 0%">
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -241,29 +379,32 @@
         let currentTaskId = null;
         let pollingTimer = null;
         let globalResults = null;
+        const sessionId = "sess_" + Math.random().toString(36).substr(2, 9);
+        document.getElementById('session-display').innerText = "SID: " + sessionId;
 
         // Poll system info every 2s
         setInterval(async () => {
             try {
                 const res = await fetch('/api/sys-info');
                 const data = await res.json();
-                document.getElementById('sys-info').innerText = data.info;
-            } catch(e) {}
+                document.getElementById('cpu-text').innerText = data.info.cpu + '%';
+                document.getElementById('cpu-bar').style.width = data.info.cpu + '%';
+                document.getElementById('ram-text').innerText = data.info.ram + '%';
+                document.getElementById('ram-bar').style.width = data.info.ram + '%';
+            } catch (e) { }
         }, 2000);
 
         // --- Tab Management ---
         function showTab(tabId) {
-            document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
-            
-            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active-tab'));
-            document.getElementById('btn-' + tabId).classList.add('active-tab');
+
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('bg-slate-800/50', 'text-white'));
+            document.getElementById('btn-' + tabId).classList.add('bg-slate-800/50', 'text-white');
         }
 
         // --- Step 1: Upload ---
-        const fileInput = document.getElementById('fileInput');
-        document.getElementById('dropzone').onclick = () => fileInput.click();
-
+        const fileInput = document.getElementById('csv_file');
         fileInput.onchange = async () => {
             if (!fileInput.files[0]) return;
             const formData = new FormData();
@@ -271,16 +412,16 @@
 
             const res = await fetch('/api/upload', { method: 'POST', body: formData });
             const data = await res.json();
-            
+
             if (data.error) return Swal.fire('Lỗi', data.error, 'error');
 
-            // Render Preview Table (Ưu tiên dùng HTML chuẩn từ Server)
+            // Render Preview Table
             if (data.preview_html) {
                 document.getElementById('preview-table').innerHTML = `<div class="custom-scrollbar overflow-x-auto">${data.preview_html}</div>`;
             } else {
                 renderTable('preview-table', data.preview);
             }
-            
+
             // Render Checkboxes
             const cbContainer = document.getElementById('cols-checkboxes');
             cbContainer.innerHTML = data.columns.map(c => `
@@ -294,6 +435,15 @@
             const hmRes = await fetch('/api/heatmap');
             const hmData = await hmRes.json();
             document.getElementById('heatmap-container').innerHTML = `<img src="data:image/png;base64,${hmData.image}" class="max-h-[500px] rounded-xl shadow-lg">`;
+
+            Swal.fire({
+                title: 'Thành công!',
+                text: 'Dữ liệu đã được nạp. Vui lòng sang bước 2.',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            });
+            setTimeout(() => showTab('preprocess'), 1500);
         };
 
         // --- Step 2: Preprocess ---
@@ -309,7 +459,7 @@
                 })
             });
             const data = await res.json();
-            if(data.error) Swal.fire('Lỗi', data.error, 'error');
+            if (data.error) Swal.fire('Lỗi', data.error, 'error');
             else {
                 Swal.fire({
                     title: 'Thành công!',
@@ -321,11 +471,8 @@
                 let html = `<p class="text-emerald-400 mb-4"><i class="fas fa-check-circle"></i> Tiền xử lý xong! Dữ liệu còn lại: ${data.shape[0]} hàng, ${data.shape[1]} cột.</p>`;
                 html += `<div id="preprocess-preview-table" class="overflow-x-auto text-sm"></div>`;
                 document.getElementById('preprocess-results').innerHTML = html;
-                
-                // Gọi hàm vẽ bảng cho dữ liệu preview mới
+
                 renderTable('preprocess-preview-table', data.preview);
-                
-                // Chờ 2 giây để người dùng xem bảng rồi mới chuyển tab
                 setTimeout(() => showTab('analyze'), 2000);
             }
         }
@@ -339,22 +486,24 @@
             const res = await fetch('/api/analyze-k', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ n_trials: document.getElementById('n_trials_val').value })
+                body: JSON.stringify({ 
+                    n_trials: document.getElementById('n_trials_val').value,
+                    session_id: sessionId
+                })
             });
             const data = await res.json();
             currentTaskId = data.task_id;
-            
+
             document.getElementById('toast-title').innerText = "Đang phân tích K tối ưu...";
             showToast(true);
-            
+
             startPolling((result) => {
                 renderPlot('img-k-km', result.plot_km);
                 renderPlot('img-k-h', result.plot_h);
                 document.getElementById('k-suggestion').innerText = result.suggestion;
                 document.getElementById('k_kmeans_val').value = result.k_km_suggest;
                 document.getElementById('k_hier_val').value = result.k_h_suggest;
-                
-                // Hiển thị bảng chi tiết
+
                 document.getElementById('k-details-container').classList.remove('hidden');
                 renderTable('k-details-table', result.k_details);
                 renderTable('k-history-table', result.voting_history);
@@ -372,12 +521,13 @@
                 body: JSON.stringify({
                     k_kmeans: document.getElementById('k_kmeans_val').value,
                     k_hier: document.getElementById('k_hier_val').value,
-                    pca_dim: document.getElementById('pca_dim_val').value
+                    pca_dim: document.getElementById('pca_dim_val').value,
+                    session_id: sessionId
                 })
             });
             const data = await res.json();
             currentTaskId = data.task_id;
-            
+
             document.getElementById('toast-title').innerText = "Đang huấn luyện mô hình...";
             showToast(true);
             startPolling((result) => {
@@ -413,15 +563,22 @@
         }
 
         function displayResults(res) {
-            renderPlot('res-plot-km', res.plot_km);
-            renderPlot('res-plot-h', res.plot_h);
-            renderPlot('res-plot-dendro', res.plot_dendro);
+            globalResults = res; // Lưu lại để dùng khi chuyển đổi nếu cần
+            const dim = document.getElementById('pca_dim_val').value;
 
+            if (dim === '3D') {
+                renderPlot('res-plot-km', res.pca3d_km);
+                renderPlot('res-plot-h', res.pca3d_h);
+            } else {
+                renderPlot('res-plot-km', res.pca2d_km);
+                renderPlot('res-plot-h', res.pca2d_h);
+            }
+
+            renderPlot('res-plot-dendro', res.plot_dendro);
             renderTable('metrics-table', res.metrics);
             renderTable('profile-km-table', res.profile_km);
             renderTable('profile-h-table', res.profile_h);
-            
-            // Tự động tạo Prompt
+
             fetch('/api/chatgpt-prompt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -437,8 +594,6 @@
         function renderPlot(id, plotData) {
             const container = document.getElementById(id);
             if (!container || !plotData) return;
-            
-            // Xóa nội dung cũ (loading hoặc ảnh cũ)
             container.innerHTML = '';
 
             if (plotData.type === 'plotly') {
@@ -452,9 +607,9 @@
                         font: { color: '#94a3b8', size: 10 },
                         margin: { l: 20, r: 20, b: 20, t: 40 }
                     };
-                    Plotly.newPlot(id, config.data, layout, {responsive: true, displayModeBar: false});
+                    Plotly.newPlot(container, config.data, layout, { responsive: true, displayModeBar: false });
                 } catch (e) {
-                    container.innerHTML = `<p class="text-red-500 text-xs p-4">Lỗi vẽ biểu đồ Plotly: ${e.message}</p>`;
+                    container.innerHTML = `<p class="text-red-500 text-xs p-4">Lỗi vẽ Plotly: ${e.message}</p>`;
                 }
             } else if (plotData.type === 'image') {
                 container.innerHTML = `<img src="data:image/png;base64,${plotData.data}" class="w-full h-full object-contain rounded-xl">`;
@@ -464,26 +619,20 @@
         // --- Helpers ---
         function renderTable(id, data) {
             if (!data || data.length === 0) return;
-            const keys = Object.keys(data[0]);
-            let html = `<table class="w-full text-left border-collapse"><thead><tr class="bg-slate-800/50">`;
-            keys.forEach(k => html += `<th class="p-3 border-b border-slate-700 text-xs">${k}</th>`);
-            html += `</tr></thead><tbody>`;
-            data.forEach(row => {
-                html += `<tr class="hover:bg-slate-800/30">`;
-                keys.forEach(k => html += `<td class="p-3 border-b border-slate-800">${row[k]}</td>`);
-                html += `</tr>`;
-            });
-            html += `</tbody></table>`;
-            document.getElementById(id).innerHTML = html;
+            const container = document.getElementById(id);
+            const headers = Object.keys(data[0]);
+            let html = `<table class="w-full text-left border-collapse border border-slate-800">`;
+            html += `<thead class="bg-slate-900/80"><tr>${headers.map(h => `<th class="p-3 border border-slate-800 text-blue-400 uppercase text-[10px]">${h}</th>`).join('')}</tr></thead>`;
+            html += `<tbody>${data.map(row => `<tr>${headers.map(h => `<td class="p-3 border border-slate-800 text-slate-300 font-mono">${row[h]}</td>`).join('')}</tr>`).join('')}</tbody>`;
+            html += `</table>`;
+            container.innerHTML = html;
         }
 
         function showToast(show) {
             const toast = document.getElementById('status-toast');
             if (show) {
                 toast.classList.remove('hidden');
-                setTimeout(() => {
-                    toast.classList.remove('translate-y-10', 'opacity-0');
-                }, 10);
+                setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 10);
             } else {
                 toast.classList.add('translate-y-10', 'opacity-0');
                 setTimeout(() => toast.classList.add('hidden'), 500);
@@ -494,46 +643,32 @@
             const area = document.getElementById('ai-prompt-area');
             area.select();
             document.execCommand('copy');
-            Swal.fire({
-                title: 'Đã copy!',
-                text: 'Bạn có thể dán vào ChatGPT.',
-                icon: 'success',
-                timer: 1000,
-                showConfirmButton: false
-            });
+            Swal.fire({ title: 'Đã copy!', text: 'Bạn có thể dán vào ChatGPT.', icon: 'success', timer: 1000, showConfirmButton: false });
         }
 
         async function downloadZip() {
-            if (!currentTaskId) return Swal.fire('Thông báo', 'Bạn cần chạy huấn luyện trước khi xuất báo cáo.', 'info');
-
-            Swal.fire({
-                title: 'Đang chuẩn bị...',
-                text: 'Hệ thống đang nén biểu đồ và dữ liệu. Vui lòng chờ trong giây lát.',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+            Swal.fire({ title: 'Đang chuẩn bị...', text: 'Hệ thống đang nén toàn bộ kết quả phiên làm việc. Vui lòng chờ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
             try {
-                const response = await fetch(`/api/export/${currentTaskId}`);
+                const response = await fetch(`/api/export/${sessionId}`);
                 if (response.ok) {
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `Full_Report_${currentTaskId}.zip`;
+                    a.download = `Full_Report_${sessionId}.zip`;
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);
                     Swal.close();
                 } else {
-                    Swal.fire('Lỗi', 'Không thể tạo file ZIP. Vui lòng thử lại.', 'error');
+                    Swal.fire('Lỗi', 'Không thể tạo file ZIP cho phiên này.', 'error');
                 }
             } catch (error) {
-                Swal.fire('Lỗi', 'Có lỗi xảy ra trong quá trình tải.', 'error');
+                Swal.fire('Lỗi', 'Có lỗi xảy ra khi tải.', 'error');
             }
         }
     </script>
 </body>
+
 </html>

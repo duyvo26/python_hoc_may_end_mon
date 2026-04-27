@@ -20,8 +20,7 @@ class DataProcessor:
         """Nạp dữ liệu từ tệp CSV."""
         self.df = pd.read_csv(file_path)
         cols = self.df.columns.tolist()
-        html_table = self.df.head().to_html(classes='table table-striped', index=False)
-        preview = f"<div style='overflow-x: auto; max-width: 100%;'>{html_table}</div>"
+        preview = self.df.head(10).to_dict(orient='records')
         return preview, cols
 
     def plot_correlation(self):

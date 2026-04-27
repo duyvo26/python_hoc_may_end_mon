@@ -22,10 +22,12 @@ from styles import setup_scientific_plots, get_sys_info
 app = Flask(__name__)
 setup_scientific_plots() # Áp dụng cấu hình biểu đồ chuẩn khoa học
 
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['RESULTS_FOLDER'] = 'results'
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['RESULTS_FOLDER'], exist_ok=True)
+UPLOAD_FOLDER = 'uploads'
+RESULTS_FOLDER = 'results'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['RESULTS_FOLDER'] = RESULTS_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
 # Khởi tạo các module lõi
 processor = DataProcessor()
@@ -50,25 +52,19 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
     
-    # Đảm bảo thư mục uploads tồn tại
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-    # Đổi tên file thành UUID để tránh trùng lặp
-    ext = os.path.splitext(file.filename)[1]
-    new_filename = f"{uuid.uuid4()}{ext}"
-    path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
-    file.save(path)
+    ext = file.filename.split('.')[-1].lower()
+    filename = f"{uuid.uuid4()}.{ext}"
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
     
-    preview_html, columns = processor.load_data(path)
+    preview, columns = processor.load_data(filepath)
     if processor.df is None:
         return jsonify({"error": "Không thể nạp dữ liệu"}), 400
     
     return jsonify({
         "message": "Upload thành công",
         "columns": columns,
-        "preview": processor.df.head(5).to_dict(orient='records'),
-        "preview_html": preview_html,
+        "preview": preview,
         "filename": file.filename
     })
 
@@ -105,30 +101,37 @@ def preprocess():
 def start_analyze_k():
     data = request.json
     n_trials = int(data.get('n_trials', 1))
+    sid = data.get('session_id', 'default_session')
     
-    task_id = "analyze_" + str(uuid.uuid4())[:8]
-    tasks[task_id] = {"status": "running", "start_time": time.time(), "message": "Đang phân tích các chỉ số K tối ưu..."}
+    task_id = f"analyze_{str(uuid.uuid4())[:8]}"
+    tasks[task_id] = {"status": "running", "start_time": time.time(), "message": "Đang phân tích K tối ưu..."}
     
-    def run_bg(tid):
+    def run_bg(tid, sid_val):
         try:
             fig_km, fig_h, k_details, best_k_msg, k_km_suggest, k_h_suggest, v_hist = model_manager.analyze_k(
-                processor.processed_df, n_trials
+                processor.processed_df, n_trials=n_trials
             )
             
             def prepare_figs(figs):
                 out = []
                 for f in figs:
-                    if hasattr(f, 'to_json'):
-                        out.append({"type": "plotly", "data": f.to_json()})
-                    else:
-                        buf = io.BytesIO()
-                        f.savefig(buf, format='png', bbox_inches='tight', dpi=100)
-                        plt.close(f)
-                        buf.seek(0)
-                        out.append({"type": "image", "data": base64.b64encode(buf.read()).decode('utf-8')})
+                    buf = io.BytesIO()
+                    f.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+                    plt.close(f)
+                    buf.seek(0)
+                    out.append({"type": "image", "data": base64.b64encode(buf.read()).decode('utf-8')})
                 return out
 
             plots_data = prepare_figs([fig_km, fig_h])
+
+            # Lưu file vào thư mục Session
+            session_dir = os.path.join(UPLOAD_FOLDER, sid_val)
+            os.makedirs(session_dir, exist_ok=True)
+            fig_km.savefig(os.path.join(session_dir, "1_Analysis_KMeans.png"), bbox_inches='tight', dpi=300)
+            fig_h.savefig(os.path.join(session_dir, "1_Analysis_Hierarchical.png"), bbox_inches='tight', dpi=300)
+            k_details.to_csv(os.path.join(session_dir, "1_K_Metrics_Detail.csv"), index=False)
+            pd.DataFrame(v_hist).to_csv(os.path.join(session_dir, "1_Voting_History.csv"), index=False)
+            processor.processed_df.to_csv(os.path.join(session_dir, "0_Processed_Data.csv"), index=False)
 
             result_data = {
                 "plot_km": plots_data[0],
@@ -145,7 +148,7 @@ def start_analyze_k():
             tasks[tid]["status"] = "failed"
             tasks[tid]["error"] = str(e)
 
-    threading.Thread(target=run_bg, args=(task_id,)).start()
+    threading.Thread(target=run_bg, args=(task_id, sid)).start()
     return jsonify({"task_id": task_id})
 
 @app.route('/api/train', methods=['POST'])
@@ -154,51 +157,67 @@ def start_train():
     k_km = int(data.get('k_kmeans', 3))
     k_h = int(data.get('k_hier', 3))
     linkage = data.get('linkage', 'ward')
-    pca_dim = data.get('pca_dim', '3D')
+    sid = data.get('session_id', 'default_session')
     
     task_id = str(uuid.uuid4())[:8]
     tasks[task_id] = {"status": "running", "start_time": time.time(), "message": "Đang huấn luyện mô hình..."}
     
-    def run_bg(tid):
+    def run_bg(tid, sid_val):
         try:
-            res = model_manager.run_clustering(
+            res_dict = model_manager.run_clustering(
                 processor.processed_df, 
                 processor.profile_base_df, 
-                k_km, k_h, linkage, pca_dim
+                k_km, k_h, linkage
             )
             
-            # Helper to prepare plots (JSON for Plotly, Base64 for Matplotlib)
-            def prepare_figs(figs):
+            session_dir = os.path.join(UPLOAD_FOLDER, sid_val)
+            os.makedirs(session_dir, exist_ok=True)
+            
+            # Lưu file 2D
+            res_dict["pca2d_km"].savefig(os.path.join(session_dir, "2_PCA_KMeans_2D.png"), bbox_inches='tight', dpi=300)
+            res_dict["pca2d_h"].savefig(os.path.join(session_dir, "2_PCA_Hierarchical_2D.png"), bbox_inches='tight', dpi=300)
+            res_dict["dendrogram"].savefig(os.path.join(session_dir, "2_Dendrogram.png"), bbox_inches='tight', dpi=300)
+            
+            res_dict["metrics"].to_csv(os.path.join(session_dir, "3_Metrics.csv"), index=False)
+            res_dict["profile_km"].to_csv(os.path.join(session_dir, "4_Profile_KMeans.csv"), index=False)
+            res_dict["profile_h"].to_csv(os.path.join(session_dir, "4_Profile_Hierarchical.csv"), index=False)
+
+            def prepare_figs(figs_list):
                 out = []
-                for f in figs:
-                    if hasattr(f, 'to_json'): # Plotly (Interactive)
+                for f in figs_list:
+                    if hasattr(f, 'to_json'):
                         out.append({"type": "plotly", "data": f.to_json()})
-                    else: # Matplotlib (Static)
+                    else:
                         buf = io.BytesIO()
-                        f.savefig(buf, format='png', bbox_inches='tight')
+                        f.savefig(buf, format='png', bbox_inches='tight', dpi=100)
                         plt.close(f)
                         buf.seek(0)
                         out.append({"type": "image", "data": base64.b64encode(buf.read()).decode('utf-8')})
                 return out
 
-            plots_data = prepare_figs([res[0], res[1], res[2]])
-            
+            plots = prepare_figs([
+                res_dict["pca2d_km"], res_dict["pca2d_h"], 
+                res_dict["pca3d_km"], res_dict["pca3d_h"],
+                res_dict["dendrogram"]
+            ])
+
             result_data = {
-                "plot_km": plots_data[0],
-                "plot_h": plots_data[1],
-                "plot_dendro": plots_data[2],
-                "metrics": res[3].to_dict(orient='records'),
-                "profile_km": res[4].to_dict(orient='records'),
-                "profile_h": res[5].to_dict(orient='records'),
-                "task_id": tid
+                "pca2d_km": plots[0], "pca2d_h": plots[1],
+                "pca3d_km": plots[2], "pca3d_h": plots[3],
+                "plot_dendro": plots[4],
+                "metrics": res_dict["metrics"].to_dict(orient='records'),
+                "profile_km": res_dict["profile_km"].to_dict(orient='records'),
+                "profile_h": res_dict["profile_h"].to_dict(orient='records')
             }
+            
             tasks[tid]["result"] = result_data
             tasks[tid]["status"] = "completed"
+
         except Exception as e:
             tasks[tid]["status"] = "failed"
             tasks[tid]["error"] = str(e)
 
-    threading.Thread(target=run_bg, args=(task_id,)).start()
+    threading.Thread(target=run_bg, args=(task_id, sid)).start()
     return jsonify({"task_id": task_id})
 
 @app.route('/api/status/<task_id>')
@@ -223,17 +242,25 @@ def get_prompt():
     prompt = f"Phân tích kết quả phân cụm:\nMetrics:\n{pd.DataFrame(data['metrics']).to_string()}\n\nProfiling K-Means:\n{pd.DataFrame(data['profile_km']).to_string()}"
     return jsonify({"prompt": prompt})
 
-@app.route('/api/export/<task_id>')
-def export_results(task_id):
-    # Đường dẫn thư mục kết quả
-    folder_path = app.config['RESULTS_FOLDER']
-    zip_name = f"Full_Report_{task_id}"
-    zip_path = os.path.join('uploads', zip_name)
+@app.route('/api/export/<session_id>')
+def export_results(session_id):
+    # Thư mục lưu kết quả phiên làm việc
+    session_dir = os.path.join(UPLOAD_FOLDER, session_id)
     
-    # Nén thư mục results
-    shutil.make_archive(zip_path, 'zip', folder_path)
+    if not os.path.isdir(session_dir) or not os.listdir(session_dir):
+        return jsonify({"error": "Chưa có kết quả nào để xuất. Hãy chạy Phân tích hoặc Huấn luyện trước."}), 404
     
-    return send_file(zip_path + ".zip", as_attachment=True)
+    zip_name = f"Full_Report_{session_id}"
+    zip_path = os.path.join(UPLOAD_FOLDER, zip_name)
+    
+    # Nén toàn bộ thư mục session
+    shutil.make_archive(zip_path, 'zip', session_dir)
+    
+    return send_file(
+        os.path.abspath(zip_path + ".zip"),
+        as_attachment=True,
+        download_name=f"{zip_name}.zip"
+    )
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

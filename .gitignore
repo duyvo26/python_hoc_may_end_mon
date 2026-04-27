@@ -105,7 +105,5 @@ Thumbs.db
 # ==============================
 # Custom Project Folders
 # ==============================
-/download/*
-/docker/
-/utils*
-frontend/public/app/*
+/results/
+/uploads/
