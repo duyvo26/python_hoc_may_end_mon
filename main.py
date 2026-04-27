@@ -8,7 +8,7 @@ import ui_content as content
 setup_styles()
 controller = AppController()
 
-with gr.Blocks() as demo:
+with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     with gr.Row():
         gr.Markdown(content.HEADER_MARKDOWN)
     
@@ -167,4 +167,4 @@ with gr.Blocks() as demo:
     timer_sys.tick(get_sys_info, outputs=[sys_info])
 
 if __name__ == "__main__":
-    demo.launch(share=True, theme=gr.themes.Soft(primary_hue="blue"))
+    demo.launch(share=True)
