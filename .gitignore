@@ -66,7 +66,6 @@ gradio_cached_examples/
 
 # Jupyter Notebook
 .ipynb_checkpoints/
-*.ipynb
 
 # ==============================
 # Logs & Caches
