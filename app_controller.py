@@ -109,25 +109,30 @@ class AppController:
         
         return f"🚀 Đang huấn luyện... (Task ID: {task_id})", task_id
 
+    def start_timer(self):
+        """Hàm hỗ trợ bật Timer từ giao diện."""
+        return gr.update(active=True)
+
     def check_task_status(self, task_id):
         """Kiểm tra trạng thái tác vụ cho cơ chế Polling 5s."""
         if not task_id or task_id not in self.tasks:
-            return gr.update(active=False), "⚠️ Không tìm thấy tác vụ", None, None, None, None, None, None
+            # Dừng timer nếu không thấy ID hợp lệ
+            return gr.update(active=False), "⚠️ Chờ lệnh...", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
         task = self.tasks[task_id]
         if task["status"] == "running":
             elapsed = int(time.time() - task["start_time"])
-            return gr.update(active=True), f"⏳ Đang xử lý... ({elapsed}s)", None, None, None, None, None, None
+            return gr.update(active=True), f"⏳ Đang xử lý... ({elapsed}s)", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         
         if task["status"] == "completed":
             res = task["result"]
-            # Trả về kết quả để hiển thị lên UI và TẮT Timer
+            # Trả về kết quả và TẮT Timer
             return gr.update(active=False), f"✅ Hoàn tất (Task: {task_id})", res[0], res[1], res[2], res[3], res[4], res[5]
         
         if "failed" in task["status"]:
-            return gr.update(active=False), f"❌ Lỗi: {task['status']}", None, None, None, None, None, None
+            return gr.update(active=False), f"❌ Lỗi: {task['status']}", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         
-        return gr.update(active=False), "Chờ...", None, None, None, None, None, None
+        return gr.update(active=False), "Dừng.", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
     def handle_export_all(self):
         """Đóng gói toàn bộ file dữ liệu và hình ảnh biểu đồ vào 1 file ZIP duy nhất để tải về."""

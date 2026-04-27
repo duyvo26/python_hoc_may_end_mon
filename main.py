@@ -145,7 +145,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
         inputs=[k_kmeans_slider, k_hier_slider, link_type, pca_dim_radio], 
         outputs=[status_task, task_id_state]
     ).then(
-        lambda: gr.update(active=True), 
+        controller.start_timer, 
         outputs=[timer_task]
     )
     
