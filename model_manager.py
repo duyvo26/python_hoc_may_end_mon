@@ -184,7 +184,8 @@ class ModelManager:
         X = processed_df.values.astype(np.float32)
 
         # ── K-Means ──────────────────────────────────────────────────────────
-        use_mini_batch = len(X) > 50000
+        use_mini_batch = len(X) > 25000
+        gc.collect()
         try:
             from sklearn.cluster import MiniBatchKMeans
         except ImportError:
@@ -214,49 +215,71 @@ class ModelManager:
         n_components = min(3, X.shape[1])
         pca = PCA(n_components=n_components)
         X_pca = pca.fit_transform(X)
+        gc.collect()
 
+        # Tìm tâm cụm
         km_centroids = pca.transform(kmeans.cluster_centers_)
-        h_centroids = np.array([X_pca[h_labels == i].mean(axis=0) for i in range(k_hierarchical)])
+        h_centroids = []
+        for i in range(k_hierarchical):
+            mask = (h_labels == i)
+            if np.any(mask):
+                h_centroids.append(X_pca[mask].mean(axis=0))
+            else:
+                h_centroids.append(np.zeros(n_components))
+        h_centroids = np.array(h_centroids)
+
+        # ── Giới hạn số điểm vẽ để tránh treo trình duyệt (Max 10,000 điểm) ───
+        MAX_PLOT_POINTS = 10000
+        if len(X_pca) > MAX_PLOT_POINTS:
+            np.random.seed(42)
+            plot_idx = np.random.choice(len(X_pca), MAX_PLOT_POINTS, replace=False)
+            X_plot = X_pca[plot_idx]
+            km_labels_plot = km_labels[plot_idx]
+            h_labels_plot = h_labels[plot_idx]
+        else:
+            X_plot = X_pca
+            km_labels_plot = km_labels
+            h_labels_plot = h_labels
 
         # ── Biểu đồ 3D ───────────────────────────────────────────────────────
         if n_components == 3 and PLOTLY_AVAILABLE:
             fig_km = go.Figure()
             fig_km.add_trace(go.Scatter3d(
-                x=X_pca[:, 0], y=X_pca[:, 1], z=X_pca[:, 2], mode='markers',
-                marker=dict(color=km_labels, colorscale='Turbo', size=6, opacity=1.0,
-                            line=dict(color='black', width=1)), name='Dữ liệu'))
+                x=X_plot[:, 0], y=X_plot[:, 1], z=X_plot[:, 2], mode='markers',
+                marker=dict(color=km_labels_plot, colorscale='Turbo', size=6, opacity=1.0,
+                            line=dict(color='black', width=1)), name='Dữ liệu (Mẫu)'))
             fig_km.add_trace(go.Scatter3d(
                 x=km_centroids[:, 0], y=km_centroids[:, 1], z=km_centroids[:, 2], mode='markers',
                 marker=dict(color='darkred', symbol='x', size=4, line=dict(width=3, color='darkred')),
                 name='Tâm cụm'))
             fig_km.update_layout(
-                title_text=f'K-Means (K={k_kmeans}) - 3D Interactive',
+                title_text=f'K-Means (K={k_kmeans}) - 3D Interactive (Hiển thị mẫu {len(X_plot)} điểm)',
                 height=600, showlegend=True, margin=dict(l=0, r=0, b=0, t=40), template='plotly_white')
 
             fig_h = go.Figure()
             fig_h.add_trace(go.Scatter3d(
-                x=X_pca[:, 0], y=X_pca[:, 1], z=X_pca[:, 2], mode='markers',
-                marker=dict(color=h_labels, colorscale='Turbo', size=6, opacity=1.0,
-                            line=dict(color='black', width=1)), name='Dữ liệu'))
+                x=X_plot[:, 0], y=X_plot[:, 1], z=X_plot[:, 2], mode='markers',
+                marker=dict(color=h_labels_plot, colorscale='Turbo', size=6, opacity=1.0,
+                            line=dict(color='black', width=1)), name='Dữ liệu (Mẫu)'))
             fig_h.add_trace(go.Scatter3d(
                 x=h_centroids[:, 0], y=h_centroids[:, 1], z=h_centroids[:, 2], mode='markers',
                 marker=dict(color='darkred', symbol='x', size=4, line=dict(width=3, color='darkred')),
                 name='Tâm cụm'))
             fig_h.update_layout(
-                title_text=f'Hierarchical (K={k_hierarchical}, {linkage_type}) - 3D Interactive',
+                title_text=f'Hierarchical (K={k_hierarchical}, {linkage_type}) - 3D (Hiển thị mẫu {len(X_plot)} điểm)',
                 height=600, showlegend=True, margin=dict(l=0, r=0, b=0, t=40), template='plotly_white')
 
         else:
             fig_km, ax1 = plt.subplots(figsize=(8, 6), dpi=300)
-            ax1.scatter(X_pca[:, 0], X_pca[:, 1], c=km_labels, cmap='viridis', edgecolor='k', alpha=0.7, s=50)
+            ax1.scatter(X_plot[:, 0], X_plot[:, 1], c=km_labels_plot, cmap='viridis', edgecolor='k', alpha=0.7, s=50)
             ax1.scatter(km_centroids[:, 0], km_centroids[:, 1], c='darkred', marker='x', s=20, linewidths=2, label='Tâm cụm')
-            ax1.set_title(f'K-Means (K={k_kmeans}) - PCA')
+            ax1.set_title(f'K-Means (K={k_kmeans}) - PCA (Mẫu {len(X_plot)} điểm)')
             ax1.legend()
 
             fig_h, ax2 = plt.subplots(figsize=(8, 6), dpi=300)
-            ax2.scatter(X_pca[:, 0], X_pca[:, 1], c=h_labels, cmap='plasma', edgecolor='k', alpha=0.7, s=50)
+            ax2.scatter(X_plot[:, 0], X_plot[:, 1], c=h_labels_plot, cmap='plasma', edgecolor='k', alpha=0.7, s=50)
             ax2.scatter(h_centroids[:, 0], h_centroids[:, 1], c='darkred', marker='x', s=20, linewidths=2, label='Tâm cụm')
-            ax2.set_title(f'Hierarchical (K={k_hierarchical}, {linkage_type}) - PCA')
+            ax2.set_title(f'Hierarchical (K={k_hierarchical}, {linkage_type}) - PCA (Mẫu {len(X_plot)} điểm)')
             ax2.legend()
 
         # ── Dendrogram ───────────────────────────────────────────────────────

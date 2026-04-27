@@ -69,9 +69,15 @@ class DataProcessor:
         if remove_outliers:
             numeric_cols = temp_df.select_dtypes(include=[np.number]).columns
             if not numeric_cols.empty:
-                z_data = temp_df[numeric_cols].fillna(temp_df[numeric_cols].mean())
-                z_scores = np.abs(stats.zscore(z_data))
-                temp_df = temp_df[(z_scores < 3).all(axis=1)]
+                # Tối ưu hoá RAM: Kiểm tra Z-score từng cột thay vì tạo ma trận lớn
+                mask = pd.Series(True, index=temp_df.index)
+                for col in numeric_cols:
+                    col_data = temp_df[col].fillna(temp_df[col].mean())
+                    std = col_data.std()
+                    if std > 0:
+                        z = np.abs((col_data - col_data.mean()) / std)
+                        mask &= (z < 3)
+                temp_df = temp_df[mask]
         
         numeric_cols = temp_df.select_dtypes(include=[np.number]).columns
         categorical_cols = temp_df.select_dtypes(exclude=[np.number]).columns
