@@ -9,7 +9,10 @@ import ui_content as content
 setup_styles()
 controller = AppController()
 
-with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
+# Khởi tạo theme chuẩn
+theme_soft = gr.themes.Soft(primary_hue="blue")
+
+with gr.Blocks() as demo:
     with gr.Row():
         gr.Markdown(content.HEADER_MARKDOWN)
     
@@ -151,4 +154,4 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="blue")) as demo:
     timer.tick(get_sys_info, outputs=[sys_info])
 
 if __name__ == "__main__":
-    demo.launch(share=True)
+    demo.launch(share=True, theme=theme_soft, debug=True)
