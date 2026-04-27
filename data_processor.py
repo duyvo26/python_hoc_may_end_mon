@@ -17,36 +17,32 @@ class DataProcessor:
         self.profile_base_df = None
 
     def load_data(self, file_path):
-        """
-        Nạp dữ liệu từ tệp CSV và tạo biểu đồ Heatmap tương quan.
-        
-        Args:
-            file_path (str): Đường dẫn tới tệp CSV cần nạp.
-            
-        Returns:
-            tuple: Gồm mã HTML xem trước, danh sách các cột, và Figure matplotlib chứa Heatmap.
-        """
+        """Nạp dữ liệu từ tệp CSV."""
         self.df = pd.read_csv(file_path)
         cols = self.df.columns.tolist()
         html_table = self.df.head().to_html(classes='table table-striped', index=False)
         preview = f"<div style='overflow-x: auto; max-width: 100%;'>{html_table}</div>"
+        return preview, cols
+
+    def plot_correlation(self):
+        """Vẽ biểu đồ Heatmap tương quan đặc trưng."""
+        if self.df is None: return None
         
-        # Heatmap
         numeric_df = self.df.select_dtypes(include=[np.number])
-        fig_corr, ax = plt.subplots(figsize=(10, 8), dpi=300)
+        fig, ax = plt.subplots(figsize=(10, 8), dpi=100)
+        
         if not numeric_df.empty:
-            # Chỉ hiển thị số liệu nếu số cột <= 10 để tránh rối rắm
             show_annot = len(numeric_df.columns) <= 12
             sns.heatmap(numeric_df.corr(), annot=show_annot, fmt=".2f", cmap='RdBu_r', center=0, 
                         linewidths=0.5, linecolor='white', annot_kws={"size": 10}, ax=ax)
-            ax.set_title("Hình 1: Ma trận tương quan đặc trưng", fontsize=14, pad=15)
+            ax.set_title("Ma trận tương quan đặc trưng", fontsize=14, pad=15)
             plt.xticks(rotation=45, ha='right', fontsize=10)
             plt.yticks(rotation=0, fontsize=10)
             plt.tight_layout()
         else:
-            ax.text(0.5, 0.5, "Không có dữ liệu số để tính tương quan", ha='center')
+            ax.text(0.5, 0.5, "Không có dữ liệu số", ha='center')
             
-        return preview, cols, fig_corr
+        return fig
 
     def preprocess_data(self, cols_to_drop, imputer_method, scaler_method, remove_outliers):
         """
