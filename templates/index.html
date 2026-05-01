@@ -258,15 +258,6 @@
                             <input type="number" id="k_hier_val" value="3"
                                 class="w-full bg-slate-900 border-none rounded-xl p-3 mt-1 text-white focus:ring-2 focus:ring-emerald-500">
                         </div>
-                        <div>
-                            <label class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">PCA
-                                Visualization</label>
-                            <select id="pca_dim_val"
-                                class="w-full bg-slate-900 border-none rounded-xl p-3 mt-1 text-white focus:ring-2 focus:ring-blue-500">
-                                <option value="2D" selected>2D (Ảnh tĩnh - Chuẩn báo cáo)</option>
-                                <option value="3D">3D (Nổi khối xoay được)</option>
-                            </select>
-                        </div>
                         <button onclick="startTrain()"
                             class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
                             <i class="fas fa-bolt"></i> Bắt đầu Huấn luyện
@@ -276,18 +267,23 @@
                 <div class="lg:col-span-3 space-y-8">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="glass p-4 rounded-2xl">
-                            <h4 class="text-xs text-slate-500 mb-2">PCA: K-Means (Kết quả trực quan)</h4>
-                            <div id="res-plot-km" class="w-full h-[400px]"></div>
+                            <h4 class="text-xs text-blue-400 mb-2 font-bold">K-Means: PCA 2D (Static)</h4>
+                            <div id="res-plot-km-2d" class="w-full h-[350px]"></div>
                         </div>
                         <div class="glass p-4 rounded-2xl">
-                            <h4 class="text-xs text-slate-500 mb-2">PCA: Hierarchical (Kết quả trực quan)</h4>
-                            <div id="res-plot-h" class="w-full h-[400px]"></div>
+                            <h4 class="text-xs text-emerald-400 mb-2 font-bold">Hierarchical: PCA 2D (Static)</h4>
+                            <div id="res-plot-h-2d" class="w-full h-[350px]"></div>
                         </div>
                     </div>
-                    <div class="glass p-6 rounded-3xl">
-                        <h3 class="font-bold mb-4 flex items-center gap-2"><i
-                                class="fas fa-sitemap text-indigo-500"></i> Dendrogram (Phân cụm phân cấp)</h3>
-                        <div id="res-plot-dendro" class="w-full h-[400px]"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="glass p-4 rounded-2xl">
+                            <h4 class="text-xs text-blue-400 mb-2 font-bold">K-Means: PCA 3D (Interactive)</h4>
+                            <div id="res-plot-km-3d" class="w-full h-[400px]"></div>
+                        </div>
+                        <div class="glass p-4 rounded-2xl">
+                            <h4 class="text-xs text-emerald-400 mb-2 font-bold">Hierarchical: PCA 3D (Interactive)</h4>
+                            <div id="res-plot-h-3d" class="w-full h-[400px]"></div>
+                        </div>
                     </div>
                     <div class="glass p-6 rounded-3xl overflow-hidden">
                         <h3 class="font-bold mb-4 text-blue-400 border-b border-slate-800 pb-2">Bảng so sánh hiệu năng
@@ -342,9 +338,20 @@
                             liệu chi tiết (CSV) để chèn vào báo cáo khoa học của bạn.</p>
                     </div>
                     <button onclick="downloadZip()"
-                        class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-5 px-12 rounded-2xl transition-all flex items-center gap-3 shadow-lg shadow-emerald-600/20">
-                        <i class="fas fa-download text-xl"></i> Tải về trọn bộ kết quả
+                        class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-5 px-12 rounded-2xl transition-all flex items-center gap-3 shadow-lg shadow-emerald-600/20 w-full justify-center">
+                        <i class="fas fa-download text-xl"></i> Tải về trọn bộ kết quả (.ZIP)
                     </button>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full pt-4 border-t border-slate-800">
+                        <button onclick="downloadReport('md')"
+                            class="bg-slate-800/50 hover:bg-slate-700 text-white py-4 rounded-2xl transition-all flex items-center justify-center gap-2 border border-slate-700">
+                            <i class="fab fa-markdown text-blue-400"></i> Báo cáo .MD
+                        </button>
+                        <button onclick="downloadReport('docx')"
+                            class="bg-slate-800/50 hover:bg-slate-700 text-white py-4 rounded-2xl transition-all flex items-center justify-center gap-2 border border-slate-700">
+                            <i class="fas fa-file-word text-blue-500"></i> Báo cáo .DOCX
+                        </button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -572,7 +579,6 @@
                 body: JSON.stringify({
                     k_kmeans: document.getElementById('k_kmeans_val').value,
                     k_hier: document.getElementById('k_hier_val').value,
-                    pca_dim: document.getElementById('pca_dim_val').value,
                     session_id: sessionId
                 })
             });
@@ -614,18 +620,16 @@
         }
 
         function displayResults(res) {
-            globalResults = res; // Lưu lại để dùng khi chuyển đổi nếu cần
-            const dim = document.getElementById('pca_dim_val').value;
+            globalResults = res; 
+            
+            // Render 2D Plots
+            renderPlot('res-plot-km-2d', res.pca2d_km);
+            renderPlot('res-plot-h-2d', res.pca2d_h);
+            
+            // Render 3D Plots
+            renderPlot('res-plot-km-3d', res.pca3d_km);
+            renderPlot('res-plot-h-3d', res.pca3d_h);
 
-            if (dim === '3D') {
-                renderPlot('res-plot-km', res.pca3d_km);
-                renderPlot('res-plot-h', res.pca3d_h);
-            } else {
-                renderPlot('res-plot-km', res.pca2d_km);
-                renderPlot('res-plot-h', res.pca2d_h);
-            }
-
-            renderPlot('res-plot-dendro', res.plot_dendro);
             renderTable('metrics-table', res.metrics);
             renderTable('profile-km-table', res.profile_km);
             renderTable('profile-h-table', res.profile_h);
@@ -649,18 +653,19 @@
 
             if (plotData.type === 'plotly') {
                 try {
-                    const config = JSON.parse(plotData.data);
+                    const config = typeof plotData.data === 'string' ? JSON.parse(plotData.data) : plotData.data;
                     const layout = {
                         ...config.layout,
                         autosize: true,
                         paper_bgcolor: 'rgba(0,0,0,0)',
                         plot_bgcolor: 'rgba(0,0,0,0)',
                         font: { color: '#94a3b8', size: 10 },
-                        margin: { l: 20, r: 20, b: 20, t: 40 }
+                        margin: { l: 0, r: 0, b: 0, t: 30 }
                     };
                     Plotly.newPlot(container, config.data, layout, { responsive: true, displayModeBar: false });
                 } catch (e) {
-                    container.innerHTML = `<p class="text-red-500 text-xs p-4">Lỗi vẽ Plotly: ${e.message}</p>`;
+                    console.error("Plotly Error:", e);
+                    container.innerHTML = `<p class="text-red-500 text-xs p-4">Lỗi vẽ 3D: ${e.message}</p>`;
                 }
             } else if (plotData.type === 'image') {
                 container.innerHTML = `<img src="data:image/png;base64,${plotData.data}" class="w-full h-full object-contain rounded-xl">`;
@@ -717,6 +722,32 @@
                 }
             } catch (error) {
                 Swal.fire('Lỗi', 'Có lỗi xảy ra khi tải.', 'error');
+            }
+        }
+        async function downloadReport(type) {
+            const url = `/api/report/${type}/${sessionId}`;
+            const filename = `Report_${sessionId}.${type}`;
+            
+            Swal.fire({ title: 'Đang tải...', text: 'Hệ thống đang chuẩn bị tệp tin.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(downloadUrl);
+                    Swal.close();
+                } else {
+                    const err = await response.json();
+                    Swal.fire('Lỗi', err.error || 'Tệp tin không tồn tại.', 'error');
+                }
+            } catch (e) {
+                Swal.fire('Lỗi', 'Không thể kết nối đến máy chủ.', 'error');
             }
         }
     </script>

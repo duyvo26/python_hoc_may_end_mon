@@ -16,6 +16,7 @@ import seaborn as sns
 
 from data_processor import DataProcessor
 from model_manager import ModelManager
+from report_generator import ReportGenerator
 
 from styles import setup_scientific_plots, get_sys_info
 
@@ -73,6 +74,10 @@ def upload_chunk():
         if processor.df is None:
             return jsonify({"error": "Không thể nạp dữ liệu"}), 400
         
+        # Lưu thông tin gốc để làm báo cáo vào processor
+        processor.original_shape = f"{processor.df.shape[0]} hàng, {processor.df.shape[1]} cột"
+        processor.df_name = original_filename
+        
         return jsonify({
             "status": "completed",
             "message": "Upload thành công",
@@ -106,6 +111,9 @@ def preprocess():
     if df is None:
         return jsonify({"error": "Lỗi tiền xử lý"}), 400
         
+    # Lưu thông tin sau tiền xử lý để làm báo cáo
+    processor.processed_shape = f"{df.shape[0]} hàng, {df.shape[1]} cột"
+    
     return jsonify({
         "message": "Tiền xử lý hoàn tất",
         "preview": df.head(5).to_dict(orient='records'),
@@ -168,6 +176,8 @@ def start_analyze_k():
                 "k_km_suggest": int(k_km_suggest),
                 "k_h_suggest": int(k_h_suggest)
             }
+            tasks[tid]["suggestion"] = best_k_msg
+            tasks[tid]["voting_history"] = v_hist if isinstance(v_hist, list) else v_hist.to_dict(orient='records')
             tasks[tid]["result"] = result_data
             tasks[tid]["status"] = "completed"
         except Exception as e:
@@ -202,7 +212,6 @@ def start_train():
             # Lưu file 2D
             res_dict["pca2d_km"].savefig(os.path.join(session_dir, "2_PCA_KMeans_2D.png"), bbox_inches='tight', dpi=300)
             res_dict["pca2d_h"].savefig(os.path.join(session_dir, "2_PCA_Hierarchical_2D.png"), bbox_inches='tight', dpi=300)
-            res_dict["dendrogram"].savefig(os.path.join(session_dir, "2_Dendrogram.png"), bbox_inches='tight', dpi=300)
             
             res_dict["metrics"].to_csv(os.path.join(session_dir, "3_Metrics.csv"), index=False)
             res_dict["profile_km"].to_csv(os.path.join(session_dir, "4_Profile_KMeans.csv"), index=False)
@@ -211,8 +220,8 @@ def start_train():
             def prepare_figs(figs_list):
                 out = []
                 for f in figs_list:
-                    if hasattr(f, 'to_json'):
-                        out.append({"type": "plotly", "data": f.to_json()})
+                    if hasattr(f, 'to_dict'):
+                        out.append({"type": "plotly", "data": f.to_dict()})
                     else:
                         buf = io.BytesIO()
                         f.savefig(buf, format='png', bbox_inches='tight', dpi=100)
@@ -223,14 +232,12 @@ def start_train():
 
             plots = prepare_figs([
                 res_dict["pca2d_km"], res_dict["pca2d_h"], 
-                res_dict["pca3d_km"], res_dict["pca3d_h"],
-                res_dict["dendrogram"]
+                res_dict["pca3d_km"], res_dict["pca3d_h"]
             ])
 
             result_data = {
                 "pca2d_km": plots[0], "pca2d_h": plots[1],
                 "pca3d_km": plots[2], "pca3d_h": plots[3],
-                "plot_dendro": plots[4],
                 "metrics": res_dict["metrics"].to_dict(orient='records'),
                 "profile_km": res_dict["profile_km"].to_dict(orient='records'),
                 "profile_h": res_dict["profile_h"].to_dict(orient='records')
@@ -238,6 +245,34 @@ def start_train():
             
             tasks[tid]["result"] = result_data
             tasks[tid]["status"] = "completed"
+
+            # TỰ ĐỘNG TẠO BÁO CÁO .MD VÀ .DOCX
+            try:
+                # Tìm thông tin từ các bước trước
+                suggestion = "Kết quả phân tích dựa trên đa chỉ số."
+                v_history = []
+                for old_tid in tasks:
+                    if old_tid.startswith("analyze") and "suggestion" in tasks[old_tid]:
+                        suggestion = tasks[old_tid]["suggestion"]
+                        v_history = tasks[old_tid].get("voting_history", [])
+                
+                d_info = tasks.get(f"data_{sid_val}", {})
+                p_info = tasks.get(f"preprocess_{sid_val}", {})
+                
+                reporter = ReportGenerator(session_dir)
+                reporter.generate(
+                    dataset_name=getattr(processor, 'df_name', 'Dữ liệu người dùng'),
+                    original_info=getattr(processor, 'original_shape', 'Không xác định'),
+                    preprocess_info=getattr(processor, 'processed_shape', 'Chưa qua tiền xử lý'),
+                    k_details=pd.read_csv(os.path.join(session_dir, "1_K_Metrics_Detail.csv")),
+                    voting_history=pd.DataFrame(v_history),
+                    best_k_msg=suggestion,
+                    metrics_df=res_dict["metrics"],
+                    profile_km=res_dict["profile_km"],
+                    profile_h=res_dict["profile_h"]
+                )
+            except Exception as re:
+                print(f"Lỗi tạo báo cáo: {re}")
 
         except Exception as e:
             tasks[tid]["status"] = "failed"
@@ -267,6 +302,20 @@ def get_prompt():
     data = request.json
     prompt = f"Phân tích kết quả phân cụm:\nMetrics:\n{pd.DataFrame(data['metrics']).to_string()}\n\nProfiling K-Means:\n{pd.DataFrame(data['profile_km']).to_string()}"
     return jsonify({"prompt": prompt})
+
+@app.route('/api/report/md/<session_id>')
+def download_report_md(session_id):
+    path = os.path.join(UPLOAD_FOLDER, session_id, "Full_Report.md")
+    if os.path.exists(path):
+        return send_file(os.path.abspath(path), as_attachment=True, download_name=f"Report_{session_id}.md")
+    return jsonify({"error": "Báo cáo chưa được tạo. Hãy chạy Huấn luyện trước."}), 404
+
+@app.route('/api/report/docx/<session_id>')
+def download_report_docx(session_id):
+    path = os.path.join(UPLOAD_FOLDER, session_id, "Full_Report.docx")
+    if os.path.exists(path):
+        return send_file(os.path.abspath(path), as_attachment=True, download_name=f"Report_{session_id}.docx")
+    return jsonify({"error": "Báo cáo chưa được tạo. Hãy chạy Huấn luyện trước."}), 404
 
 @app.route('/api/export/<session_id>')
 def export_results(session_id):

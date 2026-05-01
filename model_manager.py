@@ -165,24 +165,6 @@ class ModelManager:
         fig_pca3_km = create_3d(km.labels_, f"K-Means 3D (K={k_km})")
         fig_pca3_h = create_3d(hcl.labels_, f"Hierarchical 3D (K={k_h})")
 
-        # Dendrogram
-        from scipy.cluster.hierarchy import dendrogram, linkage as sch_linkage
-        fig_dendro, ax_d = plt.subplots(figsize=(10, 5), dpi=100)
-        Z = sch_linkage(X, method=linkage)
-        
-        # Tính toán độ cao nhát cắt cho K cụm
-        # Z[:, 2] chứa khoảng cách tại mỗi bước hợp nhất. 
-        # Nhát cắt cho K cụm nằm giữa bước hợp nhất thứ (N-K) và (N-K+1)
-        n_samples = len(X)
-        if n_samples > k_h:
-            cut_height = (Z[n_samples - k_h, 2] + Z[n_samples - k_h - 1, 2]) / 2
-            ax_d.axhline(y=cut_height, color='r', linestyle='--', label=f'Cut for K={k_h}')
-        
-        dendrogram(Z, ax=ax_d, truncate_mode='lastp', p=30)
-        ax_d.set_title(f"Dendrogram (Nhát cắt cho K={k_h})")
-        ax_d.legend()
-        fig_dendro.tight_layout()
-
         # Metrics & Profiling
         metrics = pd.DataFrame({
             "Mô hình": ["K-Means", "Hierarchical"],
@@ -204,7 +186,6 @@ class ModelManager:
             "pca2d_h": fig_pca2_h,
             "pca3d_km": fig_pca3_km,
             "pca3d_h": fig_pca3_h,
-            "dendrogram": fig_dendro,
             "metrics": metrics,
             "profile_km": get_profile(km.labels_),
             "profile_h": get_profile(hcl.labels_)

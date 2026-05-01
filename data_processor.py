@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
@@ -19,6 +20,7 @@ class DataProcessor:
     def load_data(self, file_path):
         """Nạp dữ liệu từ tệp CSV."""
         self.df = pd.read_csv(file_path)
+        self.df_name = os.path.basename(file_path)
         cols = self.df.columns.tolist()
         # Chuyển đổi NaN thành None (thành null trong JSON) để tránh lỗi parse JSON ở Frontend
         preview = self.df.head(10).replace({np.nan: None}).to_dict(orient='records')
