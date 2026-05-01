@@ -338,10 +338,16 @@ def batch_process():
     tasks[task_id] = {"status": "running", "message": "Đang giải nén dữ liệu hàng loạt..."}
     
     def run_batch_bg(tid, b_dir, z_p):
+        tasks[tid]["logs"] = []
+        def add_log(msg):
+            print(msg)
+            tasks[tid]["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+            tasks[tid]["message"] = msg
+
         try:
-            print(f"\n{'='*50}\n[BATCH] Bắt đầu quy trình xử lý hàng loạt\n{'='*50}")
+            add_log("Bắt đầu quy trình xử lý hàng loạt...")
             extract_dir = os.path.join(b_dir, "extracted")
-            print(f"[BATCH] Đang giải nén tệp tin: {z_p}")
+            add_log(f"Đang giải nén tệp tin: {os.path.basename(z_p)}")
             with zipfile.ZipFile(z_p, 'r') as z:
                 z.extractall(extract_dir)
             
@@ -351,7 +357,7 @@ def batch_process():
                     if f.endswith('.csv'):
                         csv_files.append(os.path.join(root, f))
             
-            print(f"[BATCH] Tìm thấy {len(csv_files)} tệp tin CSV.")
+            add_log(f"Tìm thấy {len(csv_files)} tệp tin CSV.")
             if not csv_files:
                 raise Exception("Không tìm thấy file .csv nào trong tệp zip.")
 
@@ -360,10 +366,9 @@ def batch_process():
             
             for i, csv_path in enumerate(csv_files):
                 csv_name = os.path.basename(csv_path)
-                print(f"\n>>> [{csv_name}] Đang xử lý ({i+1}/{len(csv_files)})")
-                tasks[tid]["message"] = f"Đang xử lý {i+1}/{len(csv_files)}: {csv_name}"
+                add_log(f"Đang xử lý ({i+1}/{len(csv_files)}): {csv_name}")
                 
-                print(f"[{csv_name}] Bước 1: Nạp và Tiền xử lý (Auto cleanup)...")
+                add_log(f"[{csv_name}] Bước 1: Nạp và Tiền xử lý (Auto Scaling)...")
                 p = DataProcessor()
                 p.load_data(csv_path)
                 p.df_name = csv_name
@@ -373,7 +378,7 @@ def batch_process():
                 s_dir = os.path.join(UPLOAD_FOLDER, s_id)
                 os.makedirs(s_dir, exist_ok=True)
                 
-                print(f"[{csv_name}] Bước 2: Phân tích K tối ưu (10 trials)...")
+                add_log(f"[{csv_name}] Bước 2: Phân tích K tối ưu (10 trials)...")
                 f_km, f_h, k_det, msg, k_km, k_h, v_h = model_manager.analyze_k(df_proc, n_trials=10)
                 
                 f_km.savefig(os.path.join(s_dir, "1_Analysis_KMeans.png"), bbox_inches='tight', dpi=300)
@@ -382,7 +387,7 @@ def batch_process():
                 plt.close(f_km)
                 plt.close(f_h)
 
-                print(f"[{csv_name}] Bước 3: Huấn luyện KMeans(K={k_km}) & Hierarchical(K={k_h})...")
+                add_log(f"[{csv_name}] Bước 3: Huấn luyện mô hình (K={k_km}/{k_h})...")
                 res = model_manager.run_clustering(df_proc, df_prof, k_km, k_h, 'ward')
                 
                 res["pca2d_km"].savefig(os.path.join(s_dir, "2_PCA_KMeans_2D.png"), bbox_inches='tight', dpi=300)
@@ -395,7 +400,7 @@ def batch_process():
                 if "pca3d_km" in res: plt.close(res["pca3d_km"])
                 if "pca3d_h" in res: plt.close(res["pca3d_h"])
 
-                print(f"[{csv_name}] Bước 4: Khởi tạo báo cáo Word & Markdown...")
+                add_log(f"[{csv_name}] Bước 4: Xuất báo cáo Word...")
                 rep = ReportGenerator(s_dir)
                 _, docx_p = rep.generate(
                     csv_name, 
@@ -406,9 +411,9 @@ def batch_process():
                 )
                 
                 shutil.copy(docx_p, os.path.join(reports_dir, f"Bao_cao_{csv_name.replace('.csv', '')}.docx"))
-                print(f"[{csv_name}] Hoàn tất! Báo cáo đã được lưu.")
+                add_log(f"[{csv_name}] Hoàn tất!")
 
-            print(f"\n[BATCH] Đang đóng gói toàn bộ báo cáo vào file ZIP...")
+            add_log("Đang đóng gói toàn bộ báo cáo vào file ZIP...")
             final_zip = os.path.join(b_dir, f"Ket_qua_Batch_{batch_id}.zip")
             with zipfile.ZipFile(final_zip, 'w') as fz:
                 for root, _, files in os.walk(reports_dir):
@@ -417,8 +422,7 @@ def batch_process():
             
             tasks[tid]["status"] = "completed"
             tasks[tid]["result_url"] = f"/api/batch/download/{batch_id}"
-            tasks[tid]["message"] = f"Hoàn tất xử lý {len(csv_files)} tệp tin!"
-            print(f"{'='*50}\n[BATCH] TOÀN BỘ QUY TRÌNH HOÀN TẤT!\n{'='*50}")
+            add_log("TOÀN BỘ QUY TRÌNH HOÀN TẤT!")
             
         except Exception as e:
             tasks[tid]["status"] = "failed"
