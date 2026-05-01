@@ -286,14 +286,16 @@ def start_train():
 def get_status(task_id):
     if task_id not in tasks: return jsonify({"error": "Not found"}), 404
     task = tasks[task_id]
-    response = {"status": task["status"]}
+    response = {
+        "status": task["status"],
+        "message": task.get("message", ""),
+        "logs": task.get("logs", [])
+    }
     if task["status"] == "running":
         response["elapsed"] = int(time.time() - task.get("start_time", time.time()))
     elif task["status"] == "completed":
-        if "result" in task:
-            response["result"] = task["result"]
-        else:
-            response["status"] = "running" # Chưa gán xong result thì coi như vẫn đang chạy
+        response["result"] = task.get("result")
+        response["result_url"] = task.get("result_url")
     elif task["status"] == "failed":
         response["error"] = task.get("error", "Unknown error")
     return jsonify(response)
@@ -379,7 +381,9 @@ def batch_process():
                 os.makedirs(s_dir, exist_ok=True)
                 
                 add_log(f"[{csv_name}] Bước 2: Phân tích K tối ưu (10 trials)...")
-                f_km, f_h, k_det, msg, k_km, k_h, v_h = model_manager.analyze_k(df_proc, n_trials=10)
+                f_km, f_h, k_det, msg, k_km, k_h, v_h = model_manager.analyze_k(
+                    df_proc, n_trials=10, log_callback=add_log
+                )
                 
                 f_km.savefig(os.path.join(s_dir, "1_Analysis_KMeans.png"), bbox_inches='tight', dpi=300)
                 f_h.savefig(os.path.join(s_dir, "1_Analysis_Hierarchical.png"), bbox_inches='tight', dpi=300)

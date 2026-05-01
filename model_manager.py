@@ -25,8 +25,9 @@ class ModelManager:
         except:
             return 0
 
-    def analyze_k(self, processed_df, n_trials=1):
+    def analyze_k(self, processed_df, n_trials=1, log_callback=None):
         """Phân tích và biểu quyết K tối ưu cho K-Means và Hierarchical Clustering."""
+        if log_callback: log_callback(f"Bắt đầu phân tích với {n_trials} lượt thử nghiệm...")
         X = processed_df.values.astype(np.float32)
         K_range = range(2, 11)
         km_final_votes = Counter()
@@ -41,6 +42,7 @@ class ModelManager:
 
         last_data = {}
         for t in range(n_trials):
+            if log_callback: log_callback(f"   + Đang chạy thử nghiệm lượt {t+1}/{n_trials}...")
             wcss, sil_km, db_km, ch_km = [], [], [], []
             sil_h, db_h, ch_h = [], [], []
             for k in K_range:
@@ -82,6 +84,10 @@ class ModelManager:
 
         final_k_km = km_final_votes.most_common(1)[0][0]
         final_k_h = h_final_votes.most_common(1)[0][0]
+        
+        if log_callback: 
+            log_callback(f"Kết quả biểu quyết: K-Means={final_k_km}, Hierarchical={final_k_h}")
+            log_callback("Đang render biểu đồ đa chỉ số...")
 
         fig_km, axes_km = plt.subplots(2, 2, figsize=(12, 8), dpi=100)
         axes_km = axes_km.flatten()

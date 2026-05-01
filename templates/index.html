@@ -794,6 +794,17 @@
             }
         }
         // --- Batch Processing ---
+        document.getElementById('batch-zip-input').addEventListener('change', function(e) {
+            const label = document.querySelector('label[for="batch-zip-input"]');
+            if (this.files && this.files.length > 0) {
+                label.innerHTML = `<i class="fas fa-check-circle text-emerald-400"></i> ${this.files[0].name}`;
+                label.classList.add('border-emerald-500/50', 'text-emerald-400');
+            } else {
+                label.innerHTML = `<i class="fas fa-file-zipper"></i> Chọn file .ZIP`;
+                label.classList.remove('border-emerald-500/50', 'text-emerald-400');
+            }
+        });
+
         async function startBatchProcess() {
             const fileInput = document.getElementById('batch-zip-input');
             if (!fileInput.files.length) return Swal.fire('Lỗi', 'Vui lòng chọn file .zip', 'error');
@@ -802,8 +813,8 @@
             formData.append('file', fileInput.files[0]);
 
             Swal.fire({
-                title: 'Khởi động Batch Mode',
-                text: 'Đang chuẩn bị...',
+                title: 'Đang tải tệp tin...',
+                text: 'Hệ thống đang nhận tệp .ZIP của bạn.',
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading()
             });
@@ -812,6 +823,7 @@
                 const res = await fetch('/api/batch-process', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.task_id) {
+                    Swal.close(); // Chỉ đóng popup sau khi upload xong để hiện console
                     pollBatchTask(data.task_id);
                 } else {
                     Swal.fire('Lỗi', data.error, 'error');
