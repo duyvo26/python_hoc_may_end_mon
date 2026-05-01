@@ -154,6 +154,36 @@
                     </div>
                 </div>
             </div>
+
+            <div class="mt-8">
+                <div
+                    class="glass p-8 rounded-3xl border border-blue-500/20 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div class="flex items-center gap-6 text-left">
+                        <div
+                            class="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/10">
+                            <i class="fas fa-boxes-stacked text-blue-500 text-3xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold mb-1">Xử lý hàng loạt (Batch Mode)</h3>
+                            <p class="text-slate-400 text-xs max-w-md">
+                                Tải lên tệp <b>.ZIP</b> chứa nhiều file .CSV. Hệ thống sẽ tự động Phân tích K, Huấn
+                                luyện và Xuất báo cáo Word cho từng file.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 w-full md:w-auto">
+                        <input type="file" id="batch-zip-input" accept=".zip" class="hidden">
+                        <label for="batch-zip-input"
+                            class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-blue-400 font-bold py-4 px-8 rounded-2xl transition-all border border-blue-500/30 flex items-center gap-2 whitespace-nowrap">
+                            <i class="fas fa-file-zipper"></i> Chọn file .ZIP
+                        </label>
+                        <button onclick="startBatchProcess()"
+                            class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-10 rounded-2xl transition-all shadow-lg shadow-blue-600/20 whitespace-nowrap">
+                            Bắt đầu Auto-Process
+                        </button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Tab 2: Preprocess -->
@@ -749,6 +779,59 @@
             } catch (e) {
                 Swal.fire('Lỗi', 'Không thể kết nối đến máy chủ.', 'error');
             }
+        }
+        // --- Batch Processing ---
+        async function startBatchProcess() {
+            const fileInput = document.getElementById('batch-zip-input');
+            if (!fileInput.files.length) return Swal.fire('Lỗi', 'Vui lòng chọn file .zip', 'error');
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            Swal.fire({
+                title: 'Khởi động Batch Mode',
+                text: 'Đang chuẩn bị...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            try {
+                const res = await fetch('/api/batch-process', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.task_id) {
+                    pollBatchTask(data.task_id);
+                } else {
+                    Swal.fire('Lỗi', data.error, 'error');
+                }
+            } catch (e) {
+                Swal.fire('Lỗi', 'Không thể kết nối máy chủ', 'error');
+            }
+        }
+
+        function pollBatchTask(taskId) {
+            const timer = setInterval(async () => {
+                const res = await fetch(`/api/status/${taskId}`);
+                const data = await res.json();
+                
+                Swal.update({ text: data.message || 'Đang xử lý...' });
+
+                if (data.status === 'completed') {
+                    clearInterval(timer);
+                    Swal.fire({
+                        title: 'Hoàn tất!',
+                        text: data.message,
+                        icon: 'success',
+                        showCancelButton: true,
+                        confirmButtonText: 'Tải về kết quả (.ZIP)',
+                        cancelButtonText: 'Đóng'
+                    }).then((result) => {
+                        if (result.isConfirmed) window.location.href = data.result_url;
+                    });
+                } else if (data.status === 'failed') {
+                    clearInterval(timer);
+                    Swal.fire('Lỗi', data.error, 'error');
+                }
+            }, 2000);
         }
     </script>
 </body>

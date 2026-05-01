@@ -5,6 +5,7 @@ import threading
 import time
 import io
 import base64
+import zipfile
 from datetime import datetime
 import pandas as pd
 from flask import Flask, render_template, request, jsonify, send_file
@@ -310,12 +311,128 @@ def download_report_md(session_id):
         return send_file(os.path.abspath(path), as_attachment=True, download_name=f"Report_{session_id}.md")
     return jsonify({"error": "Báo cáo chưa được tạo. Hãy chạy Huấn luyện trước."}), 404
 
-@app.route('/api/report/docx/<session_id>')
-def download_report_docx(session_id):
+@app.route('/api/report/docx/<session_id>', methods=['GET'])
+def download_docx(session_id):
     path = os.path.join(UPLOAD_FOLDER, session_id, "Full_Report.docx")
     if os.path.exists(path):
-        return send_file(os.path.abspath(path), as_attachment=True, download_name=f"Report_{session_id}.docx")
-    return jsonify({"error": "Báo cáo chưa được tạo. Hãy chạy Huấn luyện trước."}), 404
+        return send_file(path, as_attachment=True, download_name=f"Clustering_Report_{session_id}.docx")
+    return jsonify({"error": "Báo cáo Word chưa được tạo"}), 404
+
+@app.route('/api/batch-process', methods=['POST'])
+def batch_process():
+    if 'file' not in request.files:
+        return jsonify({"error": "Chưa chọn tệp tin"}), 400
+    
+    zip_file = request.files['file']
+    if not zip_file.filename.endswith('.zip'):
+        return jsonify({"error": "Vui lòng tải lên tệp định dạng .zip"}), 400
+
+    batch_id = str(uuid.uuid4())[:8]
+    batch_dir = os.path.join(UPLOAD_FOLDER, f"batch_{batch_id}")
+    os.makedirs(batch_dir, exist_ok=True)
+    
+    zip_path = os.path.join(batch_dir, "input.zip")
+    zip_file.save(zip_path)
+    
+    task_id = f"batch_{str(uuid.uuid4())[:8]}"
+    tasks[task_id] = {"status": "running", "message": "Đang giải nén dữ liệu hàng loạt..."}
+    
+    def run_batch_bg(tid, b_dir, z_p):
+        try:
+            print(f"\n{'='*50}\n[BATCH] Bắt đầu quy trình xử lý hàng loạt\n{'='*50}")
+            extract_dir = os.path.join(b_dir, "extracted")
+            print(f"[BATCH] Đang giải nén tệp tin: {z_p}")
+            with zipfile.ZipFile(z_p, 'r') as z:
+                z.extractall(extract_dir)
+            
+            csv_files = []
+            for root, _, files in os.walk(extract_dir):
+                for f in files:
+                    if f.endswith('.csv'):
+                        csv_files.append(os.path.join(root, f))
+            
+            print(f"[BATCH] Tìm thấy {len(csv_files)} tệp tin CSV.")
+            if not csv_files:
+                raise Exception("Không tìm thấy file .csv nào trong tệp zip.")
+
+            reports_dir = os.path.join(b_dir, "reports")
+            os.makedirs(reports_dir, exist_ok=True)
+            
+            for i, csv_path in enumerate(csv_files):
+                csv_name = os.path.basename(csv_path)
+                print(f"\n>>> [{csv_name}] Đang xử lý ({i+1}/{len(csv_files)})")
+                tasks[tid]["message"] = f"Đang xử lý {i+1}/{len(csv_files)}: {csv_name}"
+                
+                print(f"[{csv_name}] Bước 1: Nạp và Tiền xử lý (Auto cleanup)...")
+                p = DataProcessor()
+                p.load_data(csv_path)
+                p.df_name = csv_name
+                df_proc, df_prof = p.preprocess_data([], 'Mean', 'StandardScaler', True)
+                
+                s_id = f"sub_{batch_id}_{i}"
+                s_dir = os.path.join(UPLOAD_FOLDER, s_id)
+                os.makedirs(s_dir, exist_ok=True)
+                
+                print(f"[{csv_name}] Bước 2: Phân tích K tối ưu (10 trials)...")
+                f_km, f_h, k_det, msg, k_km, k_h, v_h = model_manager.analyze_k(df_proc, n_trials=10)
+                
+                f_km.savefig(os.path.join(s_dir, "1_Analysis_KMeans.png"), bbox_inches='tight', dpi=300)
+                f_h.savefig(os.path.join(s_dir, "1_Analysis_Hierarchical.png"), bbox_inches='tight', dpi=300)
+                k_det.to_csv(os.path.join(s_dir, "1_K_Metrics_Detail.csv"), index=False)
+                plt.close(f_km)
+                plt.close(f_h)
+
+                print(f"[{csv_name}] Bước 3: Huấn luyện KMeans(K={k_km}) & Hierarchical(K={k_h})...")
+                res = model_manager.run_clustering(df_proc, df_prof, k_km, k_h, 'ward')
+                
+                res["pca2d_km"].savefig(os.path.join(s_dir, "2_PCA_KMeans_2D.png"), bbox_inches='tight', dpi=300)
+                res["pca2d_h"].savefig(os.path.join(s_dir, "2_PCA_Hierarchical_2D.png"), bbox_inches='tight', dpi=300)
+                res["metrics"].to_csv(os.path.join(s_dir, "3_Metrics.csv"), index=False)
+                res["profile_km"].to_csv(os.path.join(s_dir, "4_Profile_KMeans.csv"), index=False)
+                res["profile_h"].to_csv(os.path.join(s_dir, "4_Profile_Hierarchical.csv"), index=False)
+                plt.close(res["pca2d_km"])
+                plt.close(res["pca2d_h"])
+                if "pca3d_km" in res: plt.close(res["pca3d_km"])
+                if "pca3d_h" in res: plt.close(res["pca3d_h"])
+
+                print(f"[{csv_name}] Bước 4: Khởi tạo báo cáo Word & Markdown...")
+                rep = ReportGenerator(s_dir)
+                _, docx_p = rep.generate(
+                    csv_name, 
+                    f"{p.df.shape[0]} hàng, {p.df.shape[1]} cột",
+                    f"{df_proc.shape[0]} hàng, {df_proc.shape[1]} cột",
+                    k_det, pd.DataFrame(v_h), msg,
+                    res["metrics"], res["profile_km"], res["profile_h"]
+                )
+                
+                shutil.copy(docx_p, os.path.join(reports_dir, f"Bao_cao_{csv_name.replace('.csv', '')}.docx"))
+                print(f"[{csv_name}] Hoàn tất! Báo cáo đã được lưu.")
+
+            print(f"\n[BATCH] Đang đóng gói toàn bộ báo cáo vào file ZIP...")
+            final_zip = os.path.join(b_dir, f"Ket_qua_Batch_{batch_id}.zip")
+            with zipfile.ZipFile(final_zip, 'w') as fz:
+                for root, _, files in os.walk(reports_dir):
+                    for f in files:
+                        fz.write(os.path.join(root, f), f)
+            
+            tasks[tid]["status"] = "completed"
+            tasks[tid]["result_url"] = f"/api/batch/download/{batch_id}"
+            tasks[tid]["message"] = f"Hoàn tất xử lý {len(csv_files)} tệp tin!"
+            print(f"{'='*50}\n[BATCH] TOÀN BỘ QUY TRÌNH HOÀN TẤT!\n{'='*50}")
+            
+        except Exception as e:
+            tasks[tid]["status"] = "failed"
+            tasks[tid]["error"] = str(e)
+
+    threading.Thread(target=run_batch_bg, args=(task_id, batch_dir, zip_path)).start()
+    return jsonify({"task_id": task_id})
+
+@app.route('/api/batch/download/<batch_id>', methods=['GET'])
+def download_batch(batch_id):
+    path = os.path.join(UPLOAD_FOLDER, f"batch_{batch_id}", f"Ket_qua_Batch_{batch_id}.zip")
+    if os.path.exists(path):
+        return send_file(path, as_attachment=True, download_name=f"Batch_Results_{batch_id}.zip")
+    return jsonify({"error": "Tệp tin không tồn tại"}), 404
 
 @app.route('/api/export/<session_id>')
 def export_results(session_id):
