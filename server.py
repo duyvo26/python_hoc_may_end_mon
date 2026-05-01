@@ -401,8 +401,7 @@ def batch_process():
                 res["profile_h"].to_csv(os.path.join(s_dir, "4_Profile_Hierarchical.csv"), index=False)
                 plt.close(res["pca2d_km"])
                 plt.close(res["pca2d_h"])
-                if "pca3d_km" in res: plt.close(res["pca3d_km"])
-                if "pca3d_h" in res: plt.close(res["pca3d_h"])
+
 
                 add_log(f"[{csv_name}] Bước 4: Xuất báo cáo Word...")
                 rep = ReportGenerator(s_dir)
