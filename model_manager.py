@@ -18,62 +18,62 @@ class ModelManager:
         self.results = {}
 
     def _detect_elbow_kneedle(self, wcss):
-        """Phát hiện điểm khuỷu tay (Elbow) tối ưu từ danh sách WCSS bằng thuật toán Kneedle.
-        
-        Args:
-            wcss (list): Danh sách giá trị WCSS tương ứng với mỗi K.
-        Returns:
-            int: Chỉ số (index) của K tối ưu trong danh sách.
-        """
+        """Phát hiện điểm khuỷu tay (Elbow) tối ưu từ danh sách WCSS bằng thuật toán Kneedle."""
         try:
             kn = KneeLocator(range(2, 2 + len(wcss)), wcss, curve='convex', direction='decreasing')
-            return kn.elbow - 2 if kn.elbow else np.argmin(wcss)
+            return kn.elbow - 2 if kn.elbow else 0 # Mặc định chọn K=2 nếu không tìm thấy elbow
         except:
-            return np.argmin(wcss)
+            return 0
 
     def analyze_k(self, processed_df, n_trials=1):
-        """Phân tích và biểu quyết K tối ưu cho K-Means và Hierarchical Clustering.
-
-        Chạy n_trials lần, mỗi lần tính Elbow/Silhouette/DB/CH rồi biểu quyết
-        có trọng số để chọn K tốt nhất cho từng thuật toán.
-
-        Args:
-            processed_df (pd.DataFrame): Dữ liệu đã được chuẩn hóa.
-            n_trials (int): Số lần thử nghiệm để lấy kết quả biểu quyết ổn định hơn.
-        Returns:
-            tuple: (fig_km, fig_h, detail_df, msg, final_k_km, final_k_h, voting_history)
-        """
+        """Phân tích và biểu quyết K tối ưu cho K-Means và Hierarchical Clustering."""
         X = processed_df.values.astype(np.float32)
         K_range = range(2, 11)
         km_final_votes = Counter()
         h_final_votes = Counter()
         voting_history = []
         
-        w_sil_km = int(os.getenv("WEIGHT_SIL_KM", 2))
-        w_ch_km = int(os.getenv("WEIGHT_CH_KM", 2))
-        w_elbow_km = int(os.getenv("WEIGHT_ELBOW_KM", 1))
-        w_db_h = int(os.getenv("WEIGHT_DB_H", 2))
-        w_sil_h = int(os.getenv("WEIGHT_SIL_H", 1))
-        w_ch_h = int(os.getenv("WEIGHT_CH_H", 1))
+        # Trọng số biểu quyết chuẩn khoa học
+        w_sil = int(os.getenv("WEIGHT_SIL", 2))
+        w_ch = int(os.getenv("WEIGHT_CH", 1))
+        w_db = int(os.getenv("WEIGHT_DB", 2))
+        w_elbow = int(os.getenv("WEIGHT_ELBOW", 1))
 
         last_data = {}
         for t in range(n_trials):
             wcss, sil_km, db_km, ch_km = [], [], [], []
             sil_h, db_h, ch_h = [], [], []
             for k in K_range:
+                # --- PHÂN CỤM BẰNG K-MEANS ---
+                # Cách tiếp cận: Phân hoạch không gian thành k vùng bao quanh tâm cụm.
                 km = KMeans(n_clusters=k, n_init='auto', random_state=42+t).fit(X)
-                wcss.append(km.inertia_); sil_km.append(silhouette_score(X, km.labels_))
-                db_km.append(davies_bouldin_score(X, km.labels_)); ch_km.append(calinski_harabasz_score(X, km.labels_))
+                wcss.append(km.inertia_)
+                # Tính chỉ số đánh giá dựa trên bộ nhãn (labels) của K-Means
+                sil_km.append(silhouette_score(X, km.labels_))
+                db_km.append(davies_bouldin_score(X, km.labels_))
+                ch_km.append(calinski_harabasz_score(X, km.labels_))
+                
+                # --- PHÂN CỤM BẰNG HIERARCHICAL (AGGLOMERATIVE) ---
+                # Cách tiếp cận: Gộp dần các điểm/cụm gần nhau nhất theo cấu trúc cây (Dendrogram).
                 hcl = AgglomerativeClustering(n_clusters=k).fit(X)
-                sil_h.append(silhouette_score(X, hcl.labels_)); db_h.append(davies_bouldin_score(X, hcl.labels_))
+                # Tính chỉ số đánh giá dựa trên bộ nhãn (labels) của Hierarchical
+                # LƯU Ý: Dù cùng K, nhưng nhãn của KM và H khác nhau -> Điểm Silhouette sẽ khác nhau.
+                sil_h.append(silhouette_score(X, hcl.labels_))
+                db_h.append(davies_bouldin_score(X, hcl.labels_))
                 ch_h.append(calinski_harabasz_score(X, hcl.labels_))
 
-            b_elbow = K_range[self._detect_elbow_kneedle(wcss)]
+            idx_elbow = self._detect_elbow_kneedle(wcss)
+            b_elbow = K_range[idx_elbow]
+            
             b_sil_km, b_db_km, b_ch_km = K_range[np.argmax(sil_km)], K_range[np.argmin(db_km)], K_range[np.argmax(ch_km)]
             b_sil_h, b_db_h, b_ch_h = K_range[np.argmax(sil_h)], K_range[np.argmin(db_h)], K_range[np.argmax(ch_h)]
 
-            km_trial_k = Counter([b_sil_km]*w_sil_km + [b_ch_km]*w_ch_km + [b_elbow]*w_elbow_km).most_common(1)[0][0]
-            h_trial_k = Counter([b_sil_h]*w_sil_h + [b_db_h]*w_db_h + [b_ch_h]*w_ch_h).most_common(1)[0][0]
+            # Biểu quyết có trọng số
+            km_votes = [b_sil_km]*w_sil + [b_db_km]*w_db + [b_ch_km]*w_ch + [b_elbow]*w_elbow
+            h_votes = [b_sil_h]*w_sil + [b_db_h]*w_db + [b_ch_h]*w_ch
+            
+            km_trial_k = Counter(km_votes).most_common(1)[0][0]
+            h_trial_k = Counter(h_votes).most_common(1)[0][0]
             
             km_final_votes[km_trial_k] += 1
             h_final_votes[h_trial_k] += 1
@@ -85,26 +85,38 @@ class ModelManager:
 
         fig_km, axes_km = plt.subplots(2, 2, figsize=(12, 8), dpi=100)
         axes_km = axes_km.flatten()
-        axes_km[0].plot(K_range, last_data['wcss'], 'o-'); axes_km[0].set_title('Elbow')
-        axes_km[1].plot(K_range, last_data['sil_km'], 's-'); axes_km[1].set_title('Silhouette')
-        axes_km[2].plot(K_range, last_data['db_km'], '^-'); axes_km[2].set_title('Davies-Bouldin')
-        axes_km[3].plot(K_range, last_data['ch_km'], 'D-'); axes_km[3].set_title('Calinski-Harabasz')
-        for ax in axes_km: ax.axvline(final_k_km, color='r', linestyle='--'); ax.grid(True, alpha=0.3)
+        metrics_plot = [
+            (last_data['wcss'], 'Elbow Method (Inertia)'),
+            (last_data['sil_km'], 'Silhouette Score'),
+            (last_data['db_km'], 'Davies-Bouldin Index'),
+            (last_data['ch_km'], 'Calinski-Harabasz Index')
+        ]
+        for i, (data, title) in enumerate(metrics_plot):
+            axes_km[i].plot(K_range, data, 'o-', linewidth=2)
+            axes_km[i].set_title(title)
+            axes_km[i].axvline(final_k_km, color='r', linestyle='--', label=f'Best K={final_k_km}')
+            axes_km[i].grid(True, alpha=0.3)
         plt.tight_layout()
 
         fig_h, axes_h = plt.subplots(1, 3, figsize=(15, 4.5), dpi=100)
-        axes_h[0].plot(K_range, last_data['sil_h'], 's-'); axes_h[0].set_title('Silhouette')
-        axes_h[1].plot(K_range, last_data['db_h'], '^-'); axes_h[1].set_title('Davies-Bouldin')
-        axes_h[2].plot(K_range, last_data['ch_h'], 'D-'); axes_h[2].set_title('Calinski-Harabasz')
-        for ax in axes_h: ax.axvline(final_k_h, color='r', linestyle='--'); ax.grid(True, alpha=0.3)
+        h_metrics_plot = [
+            (last_data['sil_h'], 'Silhouette Score'),
+            (last_data['db_h'], 'Davies-Bouldin Index'),
+            (last_data['ch_h'], 'Calinski-Harabasz Index')
+        ]
+        for i, (data, title) in enumerate(h_metrics_plot):
+            axes_h[i].plot(K_range, data, 's-', color='green', linewidth=2)
+            axes_h[i].set_title(title)
+            axes_h[i].axvline(final_k_h, color='r', linestyle='--', label=f'Best K={final_k_h}')
+            axes_h[i].grid(True, alpha=0.3)
         plt.tight_layout()
 
         detail_df = pd.DataFrame({
             "Chỉ số (Lần cuối)": ["Silhouette", "Davies-Bouldin", "Calinski-Harabasz", "Elbow"],
-            "K tốt nhất KM": [K_range[np.argmax(last_data['sil_km'])], K_range[np.argmin(last_data['db_km'])], K_range[np.argmax(last_data['ch_km'])], K_range[self._detect_elbow_kneedle(last_data['wcss'])]],
-            "K tốt nhất H": [K_range[np.argmax(last_data['sil_h'])], K_range[np.argmin(last_data['db_h'])], K_range[np.argmax(last_data['ch_h'])], "—"]
+            "K tốt nhất KM": [b_sil_km, b_db_km, b_ch_km, b_elbow],
+            "K tốt nhất H": [b_sil_h, b_db_h, b_ch_h, "—"]
         })
-        msg = f"Kết quả sau {n_trials} lần biểu quyết: KM={final_k_km}, H={final_k_h}"
+        msg = f"Kết quả đồng thuận sau {n_trials} lần thử: KM={final_k_km}, H={final_k_h}"
         return fig_km, fig_h, detail_df, msg, final_k_km, final_k_h, voting_history
 
     def run_clustering(self, df, profile_df, k_km, k_h, linkage='ward'):
