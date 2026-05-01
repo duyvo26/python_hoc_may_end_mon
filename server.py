@@ -329,6 +329,13 @@ def batch_process():
     if not zip_file.filename.endswith('.zip'):
         return jsonify({"error": "Vui lòng tải lên tệp định dạng .zip"}), 400
 
+    # Lấy cài đặt từ form
+    imp_method = request.form.get('imp_method', 'Mean')
+    scl_method = request.form.get('scl_method', 'StandardScaler')
+    remove_outliers = request.form.get('remove_outliers', 'true').lower() == 'true'
+    n_trials = int(request.form.get('n_trials', 10))
+    linkage = request.form.get('linkage', 'ward')
+
     batch_id = str(uuid.uuid4())[:8]
     batch_dir = os.path.join(UPLOAD_FOLDER, f"batch_{batch_id}")
     os.makedirs(batch_dir, exist_ok=True)
@@ -339,8 +346,15 @@ def batch_process():
     task_id = f"batch_{str(uuid.uuid4())[:8]}"
     tasks[task_id] = {"status": "running", "message": "Đang giải nén dữ liệu hàng loạt..."}
     
-    def run_batch_bg(tid, b_dir, z_p):
+    def run_batch_bg(tid, b_dir, z_p, settings):
+        imp_m = settings['imp_method']
+        scl_m = settings['scl_method']
+        rem_out = settings['remove_outliers']
+        trials = settings['n_trials']
+        link = settings['linkage']
+
         tasks[tid]["logs"] = []
+
         def add_log(msg):
             print(msg)
             tasks[tid]["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
@@ -374,16 +388,18 @@ def batch_process():
                 p = DataProcessor()
                 p.load_data(csv_path)
                 p.df_name = csv_name
-                df_proc, df_prof = p.preprocess_data([], 'Mean', 'StandardScaler', True)
+                df_proc, df_prof = p.preprocess_data([], imp_m, scl_m, rem_out)
+
                 
                 s_id = f"sub_{batch_id}_{i}"
                 s_dir = os.path.join(UPLOAD_FOLDER, s_id)
                 os.makedirs(s_dir, exist_ok=True)
                 
-                add_log(f"[{csv_name}] Bước 2: Phân tích K tối ưu (10 trials)...")
+                add_log(f"[{csv_name}] Bước 2: Phân tích K tối ưu ({trials} trials)...")
                 f_km, f_h, k_det, msg, k_km, k_h, v_h = model_manager.analyze_k(
-                    df_proc, n_trials=10, log_callback=add_log
+                    df_proc, n_trials=trials, log_callback=add_log
                 )
+
                 
                 f_km.savefig(os.path.join(s_dir, "1_Analysis_KMeans.png"), bbox_inches='tight', dpi=300)
                 f_h.savefig(os.path.join(s_dir, "1_Analysis_Hierarchical.png"), bbox_inches='tight', dpi=300)
@@ -391,8 +407,9 @@ def batch_process():
                 plt.close(f_km)
                 plt.close(f_h)
 
-                add_log(f"[{csv_name}] Bước 3: Huấn luyện mô hình (K={k_km}/{k_h})...")
-                res = model_manager.run_clustering(df_proc, df_prof, k_km, k_h, 'ward')
+                add_log(f"[{csv_name}] Bước 3: Huấn luyện mô hình (K={k_km}/{k_h}, Linkage={link})...")
+                res = model_manager.run_clustering(df_proc, df_prof, k_km, k_h, link)
+
                 
                 res["pca2d_km"].savefig(os.path.join(s_dir, "2_PCA_KMeans_2D.png"), bbox_inches='tight', dpi=300)
                 res["pca2d_h"].savefig(os.path.join(s_dir, "2_PCA_Hierarchical_2D.png"), bbox_inches='tight', dpi=300)
@@ -431,7 +448,15 @@ def batch_process():
             tasks[tid]["status"] = "failed"
             tasks[tid]["error"] = str(e)
 
-    threading.Thread(target=run_batch_bg, args=(task_id, batch_dir, zip_path)).start()
+    settings = {
+        "imp_method": imp_method,
+        "scl_method": scl_method,
+        "remove_outliers": remove_outliers,
+        "n_trials": n_trials,
+        "linkage": linkage
+    }
+    threading.Thread(target=run_batch_bg, args=(task_id, batch_dir, zip_path, settings)).start()
+
     return jsonify({"task_id": task_id})
 
 @app.route('/api/batch/download/<batch_id>', methods=['GET'])
