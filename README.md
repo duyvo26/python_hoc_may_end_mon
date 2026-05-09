@@ -34,8 +34,37 @@ Sử dụng thư viện `scikit-learn` cho hầu hết các thuật toán học 
 
 ---
 
-## 2. Kiến trúc & Chức năng Từng Module
-Hệ thống được thiết kế theo mô hình Modular để dễ dàng quản lý.
+## 2. Sơ đồ kiến trúc và Quy trình hệ thống
+
+Hệ thống được thiết kế theo kiến trúc module hóa chặt chẽ, tách biệt giữa xử lý logic máy học và điều phối API. Sơ đồ dưới đây mô tả luồng dữ liệu từ khâu tiếp nhận cho đến khi xuất báo cáo:
+
+```mermaid
+graph TD
+    subgraph "Giao diện Người dùng (Frontend)"
+        UI[Trình duyệt Web - HTML/JS] -->|1. Upload| API
+        API -->|6. Render| UI
+    end
+
+    subgraph "Hậu đài (Backend - Flask)"
+        API[API Endpoints - server.py] -->|2. Tiền xử lý| DP[DataProcessor]
+        DP -->|3. Phân tích K| MM[ModelManager]
+        MM -->|4. Huấn luyện & PCA| MM
+        MM -->|5. Sinh báo cáo| RG[ReportGenerator]
+    end
+
+    subgraph "Lõi xử lý (Logic)"
+        DP --- DP1[Lọc nhiễu Z-score/Imputation]
+        MM --- MM1[K-Means / Hierarchical]
+        MM --- MM2[Voting Mechanism: Silhouette/Elbow]
+        RG --- RG1[Python-docx / Matplotlib 300DPI]
+    end
+    
+    style UI fill:#f9f,stroke:#333,stroke-width:2px
+    style API fill:#bbf,stroke:#333,stroke-width:2px
+    style MM fill:#bfb,stroke:#333,stroke-width:2px
+```
+
+### Cấu trúc thư mục dự án:
 
 ```text
 ├── server.py           # Điều phối API, Threading ngầm và Route
@@ -43,7 +72,9 @@ Hệ thống được thiết kế theo mô hình Modular để dễ dàng quả
 ├── model_manager.py    # Lõi toán học, thuật toán và xuất hình ảnh đồ thị
 ├── report_generator.py # Sinh báo cáo tự động Markdown/Word
 ├── styles.py           # Thiết lập quy chuẩn hiển thị đồ thị (Matplotlib config)
-└── static/templates    # Giao diện Frontend (HTML, CSS, JS)
+├── requirements.txt    # Danh sách thư viện phụ thuộc
+├── uploads/            # Thư mục lưu trữ dữ liệu tạm thời
+└── templates/          # Giao diện người dùng
 ```
 
 ### Chi tiết chức năng từng lớp (Class):
@@ -105,6 +136,12 @@ Quy trình vòng đời của một file dữ liệu từ khi upload đến khi 
 - Server bung nén vào thư mục tạm. Một Thread khổng lồ sẽ lặp qua (Loop) toàn bộ 10 file CSV này.
 - Tại mỗi file, hệ thống tự động chạy vòng đời: Khởi tạo dữ liệu $\rightarrow$ Xử lý $\rightarrow$ Tìm K $\rightarrow$ Fit PCA $\rightarrow$ Sinh `.docx`. Toàn bộ log console được đẩy realtime về Web.
 - Sau khi xong 10 file, gom tất cả file báo cáo `.docx` vào một file ZIP mới và trả link tải về cho client.
+
+**6. Xuất báo cáo và Tổng hợp kết quả (Final Output)**
+- Sau khi quá trình huấn luyện hoàn tất, hệ thống tự động kích hoạt `ReportGenerator`.
+- **Tạo tệp .docx:** Module này sử dụng các template có sẵn, tự động chèn các biểu đồ chất lượng cao (300 DPI) và các bảng số liệu thống kê (Profiling) vào các bookmark tương ứng.
+- **Đóng gói:** Mọi tài sản (ảnh đồ thị, file CSV kết quả, file Word) được lưu trữ tập trung tại thư mục `uploads/<session_id>/`.
+- **Phản hồi người dùng:** Giao diện hiển thị thông báo hoàn tất và cung cấp liên kết tải xuống trực tiếp, đảm bảo trải nghiệm người dùng liền mạch.
 
 ---
 
