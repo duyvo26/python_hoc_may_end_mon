@@ -66,11 +66,17 @@ class ModelManager:
 
             idx_elbow = self._detect_elbow_kneedle(wcss)
             b_elbow = K_range[idx_elbow]
-            
+            # Tìm giá trị K tốt nhất (b_ = best) cho từng chỉ số đánh giá dựa trên mảng kết quả:
+            # - Silhouette (sil) và Calinski-Harabasz (ch): Điểm càng CAO càng tốt -> Dùng np.argmax để tìm vị trí max.
+            # - Davies-Bouldin (db): Điểm càng THẤP càng tốt -> Dùng np.argmin để tìm vị trí min.
+            # K_range[vị_trí] sẽ trả về đúng số cụm K tương ứng với điểm số đó.
             b_sil_km, b_db_km, b_ch_km = K_range[np.argmax(sil_km)], K_range[np.argmin(db_km)], K_range[np.argmax(ch_km)]
             b_sil_h, b_db_h, b_ch_h = K_range[np.argmax(sil_h)], K_range[np.argmin(db_h)], K_range[np.argmax(ch_h)]
 
-            # Biểu quyết có trọng số
+            # Biểu quyết có trọng số (Weighted Voting)
+            # Tạo một danh sách (votes), trong đó mỗi K tốt nhất (b_sil, b_db, b_ch, b_elbow) 
+            # sẽ được lặp lại số lần tương ứng với trọng số của chỉ số đó (w_sil, w_db, w_ch, w_elbow).
+            # Giá trị K xuất hiện nhiều lần nhất trong danh sách sẽ được chọn làm K tối ưu.
             km_votes = [b_sil_km]*w_sil + [b_db_km]*w_db + [b_ch_km]*w_ch + [b_elbow]*w_elbow
             h_votes = [b_sil_h]*w_sil + [b_db_h]*w_db + [b_ch_h]*w_ch
             
